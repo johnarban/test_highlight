@@ -1,0 +1,3 @@
+div.plotly > .svg-container:first-of-type(svg.main-svg) {
+    border: 1px solid red;
+}
