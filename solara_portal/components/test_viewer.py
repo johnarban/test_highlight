@@ -7,185 +7,154 @@ import numpy as np
 
 from glue.core import Data
 
-from typing import Optional, cast
 import numpy as np
 import plotly.graph_objects as go
 from plotly.basedatatypes import BaseTraceType
 from plotly.callbacks import Points, InputDeviceState
-from typing import Callable, Optional, List
+from typing import Callable, Optional, List, cast
 
 
 
-def setup_bin_highlight(
-        viewer,  # Assuming 'Viewer' is a class defined elsewhere
-        color: str = 'rgba(126,126,126,0.5)', 
-        line_color: str | None = 'white',
-        line_width: int = 1, 
-        bin_width: float = 0.98,
-        on_hover: Optional[Callable] = None,
-        on_unhover: Optional[Callable] = None,
-        use_selection_layer: bool = True,
-        selection_bin_width: float = 0.98,
-        only_show_with_data = False,
-        ) -> Optional[List[Callable]]:
-    """ # docs via github copilot
-    Sets up bin highlighting for a viewer.
+class BinHighlighter:
+    def __init__(self, viewer):
+        self.viewer = viewer
+        self.hover_callback = None
+        self.unhover_callback = None
+        self.enabled = False
+        self.use_selection_layer = True
 
-    Parameters:
-    viewer : CDSViewer
-        The viewer object to set up bin highlighting for.
-    color : str, optional
-        The plotly compliant color of the bin highlight (default is 'rgba(0,0,0,0.5)').
-    line_color : str, optional
-        The color of the bin highlight line (default is 'red').
-    line_width : int, optional
-        The width of the bin highlight line (default is 2).
-    bin_width : float, optional
-        The width of the bin highlight (default is 0.98).
-    on_hover : Callable, optional
-        Callback function to be called on hover (default is None).
-    on_unhover : Callable, optional
-        Callback function to be called on unhover (default is None).
-    use_selection_layer : bool, optional
-        Whether to use the selection layer for highlighting (default is True).
-    selection_bin_width : float, optional
-        The width of the selection bin (default is 0.2).
-    only_show_with_data : bool, optional
-        Whether to only show bins with data (default is False).
-
-    Returns:
-    None
-    """
-    if not hasattr(viewer, 'selection_layer'):
-        return
-    bin_edges = viewer.state.bins
-    ymax = viewer.state.y_max
-    
-    bins = (bin_edges[0:-1] + bin_edges[1:]) / 2
-    dx = bin_edges[1] - bin_edges[0]
-    if only_show_with_data:
-        keep = np.full_like(bins, False, dtype=bool)
-        for layer in viewer.state.layers:
-            if hasattr(layer, 'histogram'):
-                data = layer.histogram[1]
-                keep = keep | (data > 0)
-        bins = bins[keep]
-    
-    def nearest_bin(x: float) -> float:
-        return bins[np.argmin(np.abs(x - bins))]
-    
-    def hover_trace(x: float = 0) -> go.Bar: 
-        return go.Bar(
-        name='hover_trace',
-        meta='hover_trace_meta',
-        x=[nearest_bin(x)],
-        y=[ymax],
-        width=dx * bin_width,
-        marker={
-            'color':color,
-            'line': {
-                'color':line_color,
-                'width': line_width
-                }
-                },
-        hoverinfo= 'skip', # if this is not skipped it will take over the selection layer and clicks will not work
-        zorder=0,
-        visible=False,
-        showlegend=False
-    )
-    
-    # viewer.figure.update_layout(hovermode="closest")
-    viewer.figure.add_trace(hover_trace())
-    
-    def on_hover_callback(trace: BaseTraceType, points: Points, state: InputDeviceState) -> None:
-        print('Hover')
-        if len(points.xs) == 0:
+    def setup_bin_highlight(self,
+                            color: str = 'rgba(126,126,126,0.5)',
+                            line_color: str | None = 'white',
+                            line_width: int = 1,
+                            bin_width: float = 0.98,
+                            on_hover: Optional[Callable] = None,
+                            on_unhover: Optional[Callable] = None,
+                            use_selection_layer: bool = True,
+                            selection_bin_width: float = 0.98,
+                            only_show_with_data: bool = False) -> None:
+        if not hasattr(self.viewer, 'selection_layer'):
             return
-        old_bar = next(viewer.figure.select_traces({'meta': 'hover_trace_meta'}))
-        if old_bar is not None:
-            old_bar.x = [nearest_bin(points.xs[0])]
-            old_bar.visible = True
-            if on_hover is not None:
-                on_hover(trace, points, state, old_bar)
-    
-    def on_unhover_callback(trace: BaseTraceType, points: Points, state: InputDeviceState) -> None:
-        print('Unhover')
-        if len(points.xs) == 0:
-            print('No points')
-            old_bar = next(viewer.figure.select_traces({'meta': 'hover_trace_meta'}))
+
+        bin_edges = self.viewer.state.bins
+        ymax = self.viewer.state.y_max
+
+        bins = (bin_edges[0:-1] + bin_edges[1:]) / 2
+        dx = bin_edges[1] - bin_edges[0]
+
+        if only_show_with_data:
+            keep = np.full_like(bins, False, dtype=bool)
+            for layer in self.viewer.state.layers:
+                if hasattr(layer, 'histogram'):
+                    data = layer.histogram[1]
+                    keep = keep | (data > 0)
+            bins = bins[keep]
+
+        def nearest_bin(x: float) -> float:
+            return bins[np.argmin(np.abs(x - bins))]
+
+        def hover_trace(x: float = 0) -> go.Bar:
+            return go.Bar(
+                name='hover_trace',
+                meta='hover_trace_meta',
+                x=[nearest_bin(x)],
+                y=[ymax],
+                width=dx * bin_width,
+                marker={
+                    'color': color,
+                    'line': {
+                        'color': line_color,
+                        'width': line_width
+                    }
+                },
+                hoverinfo='skip',
+                zorder=0,
+                visible=False,
+                showlegend=False
+            )
+
+        self.viewer.figure.add_trace(hover_trace())
+
+        def on_hover_callback(trace: BaseTraceType, points: Points, state: InputDeviceState) -> None:
+            print('Hover')
+            if len(points.xs) == 0:
+                return
+            old_bar = next(self.viewer.figure.select_traces({'meta': 'hover_trace_meta'}))
             if old_bar is not None:
-                old_bar.visible = False
-                if on_unhover is not None:
-                    on_unhover(trace, points, state, old_bar)
-    
-   
-        
+                old_bar.x = [nearest_bin(points.xs[0])]
+                old_bar.visible = True
+                if on_hover is not None:
+                    on_hover(trace, points, state, old_bar)
 
-    if use_selection_layer:
-        viewer.selection_layer.on_hover(on_hover_callback)
-        viewer.selection_layer.on_unhover(on_unhover_callback)
-    else:
-        bin_layer = go.Bar(
-            name='all_bins',
-            meta='all_bins_meta',
-            x=bins,
-            y=[ymax]*len(bins),
-            width=dx * selection_bin_width,
-            marker={'color': 'rgba(0,0,0,0)','line': {'color': 'rgba(0,0,0,1)'}},
-            hoverinfo='none', # if you use skip, it will use the selection layer for selecting
-            zorder=0,
-            visible=True,
-            showlegend=False
-        )
-        viewer.figure.add_trace(bin_layer)
-        bin_layer = next(viewer.figure.select_traces({'meta': 'all_bins_meta'}))
-        # 
-        # bin_layer.update(hovertemplate=f"%{{x:,.0f}}<extra></extra>")
-        bin_layer.on_hover(on_hover_callback)
-        bin_layer.on_unhover(on_unhover_callback)
-        
-    return [on_hover_callback, on_unhover_callback]
+        def on_unhover_callback(trace: BaseTraceType, points: Points, state: InputDeviceState) -> None:
+            print('Unhover')
+            if len(points.xs) == 0:
+                print('No points')
+                old_bar = next(self.viewer.figure.select_traces({'meta': 'hover_trace_meta'}))
+                if old_bar is not None:
+                    old_bar.visible = False
+                    if on_unhover is not None:
+                        on_unhover(trace, points, state, old_bar)
 
-def turn_off_bin_highlight(viewer, hover_callback = None, unhover_callback = None):
-        
-        if not hasattr(viewer, 'selection_layer') or viewer is None:
+        if use_selection_layer:
+            self.viewer.selection_layer.on_hover(on_hover_callback)
+            self.viewer.selection_layer.on_unhover(on_unhover_callback)
+        else:
+            bin_layer = go.Bar(
+                name='all_bins',
+                meta='all_bins_meta',
+                x=bins,
+                y=[ymax]*len(bins),
+                width=dx * selection_bin_width,
+                marker={'color': 'rgba(0,0,0,0)', 'line': {'color': 'rgba(0,0,0,1)'}},
+                hoverinfo='none',
+                zorder=0,
+                visible=True,
+                showlegend=False
+            )
+            self.viewer.figure.add_trace(bin_layer)
+            bin_layer = next(self.viewer.figure.select_traces({'meta': 'all_bins_meta'}))
+            bin_layer.on_hover(on_hover_callback)
+            bin_layer.on_unhover(on_unhover_callback)
+
+        self.hover_callback = on_hover_callback
+        self.unhover_callback = on_unhover_callback
+        self.enabled = True
+
+    def turn_off_bin_highlight(self):
+        if not hasattr(self.viewer, 'selection_layer') or self.viewer is None:
             return
         print('Turning off bin highlight')
-        bin_layer = next(viewer.figure.select_traces({'meta': 'all_bins_meta'}), None)
-        
-        if hasattr(viewer.selection_layer, 'remove_selection_layer_callback'):
-            pass
-        
-        if hover_callback in viewer.selection_layer._hover_callbacks:
+        bin_layer = next(self.viewer.figure.select_traces({'meta': 'all_bins_meta'}), None)
+
+        if self.hover_callback in self.viewer.selection_layer._hover_callbacks:
             print('Removing hover callback from selection layer')
-            index = viewer.selection_layer._hover_callbacks.index(callback) # type: ignore
-            viewer.selection_layer._hover_callbacks.pop(index) # type: ignore                
-            if bin_layer and hover_callback in bin_layer._hover_callbacks:
+            index = self.viewer.selection_layer._hover_callbacks.index(self.hover_callback)
+            self.viewer.selection_layer._hover_callbacks.pop(index)
+            if bin_layer and self.hover_callback in bin_layer._hover_callbacks:
                 print('Removing hover callback from bin layer')
-                index = bin_layer._hover_callbacks.index(callback) # type: ignore
+                index = bin_layer._hover_callbacks.index(self.hover_callback)
                 bin_layer._hover_callbacks.pop(index)
                 bin_layer.hoverinfo = 'skip'
-        
-        if unhover_callback in viewer.selection_layer._unhover_callbacks:
+
+        if self.unhover_callback in self.viewer.selection_layer._unhover_callbacks:
             print('Removing unhover callback from selection layer')
-            index = viewer.selection_layer._unhover_callbacks.index(callback) # type: ignore
-            viewer.selection_layer._unhover_callbacks.pop(index) # type: ignore
-            if bin_layer and unhover_callback in bin_layer._unhover_callbacks:
+            index = self.viewer.selection_layer._unhover_callbacks.index(self.unhover_callback)
+            self.viewer.selection_layer._unhover_callbacks.pop(index)
+            if bin_layer and self.unhover_callback in bin_layer._unhover_callbacks:
                 print('Removing unhover callback from bin layer')
-                index = bin_layer._unhover_callbacks.index(callback) # type: ignore
+                index = bin_layer._unhover_callbacks.index(self.unhover_callback)
                 bin_layer._unhover_callbacks.pop(index)
                 bin_layer.hoverinfo = 'skip'
-        
-        
-        # remove the bin layer and hover layer if they exist
 
-        traces = list(viewer.figure.data)
+        traces = list(self.viewer.figure.data)
         for trace_meta in ['hover_trace_meta', 'all_bins_meta']:
-            trace = next(viewer.figure.select_traces({'meta': trace_meta}), None)
+            trace = next(self.viewer.figure.select_traces({'meta': trace_meta}), None)
             if trace and trace in traces:
                 idx = traces.index(trace)
                 traces.pop(idx)
-        viewer.figure.data = tuple(traces)
+        self.viewer.figure.data = tuple(traces)
+        self.enabled = False
 
 @solara.component
 def TestViewer(gjapp, 
@@ -199,6 +168,7 @@ def TestViewer(gjapp,
     viewer_container = rv.Html(tag='div', style_=f"width: 100%; height: 100%")
     use_selection_layer = solara.use_reactive(use_selection_layer)
     highlight_bins = solara.use_reactive(highlight_bins)
+    bin_highlighter: solara.Reactive[BinHighlighter | None] = solara.use_reactive(None)
     nbins = solara.use_reactive(nbins)
     callbacks = solara.use_reactive([])
     
@@ -246,23 +216,35 @@ def TestViewer(gjapp,
         viewer._update_selection_layer_bounds = new_update_selection
         new_update_selection()
     
+        # Create BinHighlighter instance
+        bin_highlighter.set(BinHighlighter(viewer))
+
         def toggle_bin_highlight(turn_on: bool):
             print('Toggling bin highlight', turn_on)
+            if bin_highlighter.value is None:
+                return
             if turn_on:
-                cb = setup_bin_highlight(viewer, 
-                                    on_hover=on_hover_callback, 
-                                    bin_width=.3, 
-                                    use_selection_layer = use_selection_layer.value,
-                                    selection_bin_width = .3,
-                                    only_show_with_data = False)
-
-                callbacks.value = cb or []
+                bin_highlighter.value.setup_bin_highlight(
+                    on_hover=on_hover_callback, 
+                    bin_width=.3, 
+                    use_selection_layer=use_selection_layer.value,
+                    selection_bin_width=.3,
+                    only_show_with_data=False
+                )
             else:
-                turn_off_bin_highlight(viewer, *callbacks.value)
+                bin_highlighter.value.turn_off_bin_highlight()
         
         toggle_bin_highlight(highlight_bins.value)
         highlight_bins.subscribe(toggle_bin_highlight)
-        use_selection_layer.subscribe(lambda x: toggle_bin_highlight(highlight_bins.value))
+        def on_use_selection_layer(value: bool):
+            if bin_highlighter.value is None:
+                return
+            if bin_highlighter.value.enabled:
+                bin_highlighter.value.turn_off_bin_highlight()
+                toggle_bin_highlight(highlight_bins.value)
+            else:
+                toggle_bin_highlight(highlight_bins.value)
+        use_selection_layer.subscribe(on_use_selection_layer)
         
         def cleanup():
                 vc.children = ()
