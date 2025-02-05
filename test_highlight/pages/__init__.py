@@ -146,8 +146,8 @@ def Page():
                 x_label = 'Value',
                 y_label = 'Count',
                 highlight_bins=highlight_bins,
-                nbin=nbins.value
-                
+                nbin=nbins.value,
+                use_js = False
                 )       
         else:
             TestViewer(app, 

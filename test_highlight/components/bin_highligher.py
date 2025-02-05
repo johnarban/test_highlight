@@ -124,7 +124,7 @@ class BinHighlighter:
         self.show_all_bins = show_all_bins
         self.setup_selection_layer = setup_selection_layer
         self.highlight_on_click = highlight_on_click
-        self.only_show = True
+        self.only_show = only_show
 
 
     def _calculate_bins(self):

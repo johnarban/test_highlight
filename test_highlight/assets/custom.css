@@ -1,11 +1,7 @@
-g.cartesianlayer > g > g.plot > g.barlayer2.mlayer > g > g > g > path:hover {
- display: none;   
-}
 
-
-g.cartesianlayer > g > g.plot > g.barlayer2.mlayer > g > g > g > path {
+/* g.cartesianlayer > g > g.plot > g.barlayer2.mlayer > g > g > g > path {
     pointer-events: all;
-}
+} */
 /* 
 g.cartesianlayer > g > g.plot > g.barlayer2.mlayer > g > g > g > path:hover {
     display: none;

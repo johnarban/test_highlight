@@ -66,7 +66,8 @@ def DotplotViewer(
     x_bounds: Optional[Reactive[list[float]]] = None,
     reset_bounds: Reactive[list] = Reactive([]),
     hide_layers: Reactive[List[Data | Subset]] | list[Data | Subset] = [],
-    highlight_bins: Reactive[bool] | bool = False
+    highlight_bins: Reactive[bool] | bool = False,
+    use_js = False
     ):
     
     """
@@ -361,23 +362,25 @@ def DotplotViewer(
                 if on_click_callback is not None:
                     on_click_callback(points)
             bin_highlighter = None
-            # bin_highlighter = BinHighlighter(dotplot_view,
-            #                                  line_color='rgba(120, 120, 255, 1)',
-            #                                  fill_color='rgba(0,0,0,.5)',
-            #                                  show_all_bins=True,
-            #                                  show_bins_with_data_only=True,
-            #                                  on_hover_callback=bin_on_hover,
-            #                                  use_selection_layer=True,
-            #                                  setup_selection_layer=False,
-            #                                  highlight_on_click=False,
-            #                                  )
-            bin_highlighter = BinHighlighter(
-                dotplot_view,
-                only_show = True,
-                show_all_bins=True,
-                show_bins_with_data_only=True,
-                selection_bin_width=1
-            )
+            if not use_js:
+                bin_highlighter = BinHighlighter(dotplot_view,
+                                                line_color='rgba(120, 120, 255, 1)',
+                                                fill_color='rgba(0,0,0,.5)',
+                                                show_all_bins=False,
+                                                show_bins_with_data_only=True,
+                                                on_hover_callback=bin_on_hover,
+                                                use_selection_layer=True,
+                                                setup_selection_layer=False,
+                                                highlight_on_click=False,
+                                                )
+            else:                                    
+                bin_highlighter = BinHighlighter(
+                    dotplot_view,
+                    only_show = True,
+                    show_all_bins=True,
+                    show_bins_with_data_only=True,
+                    selection_bin_width=1
+                )
             def turn_off_bin_highlighter():
                 if bin_highlighter is not None:
                     bin_highlighter.turn_off_bin_highlight()
