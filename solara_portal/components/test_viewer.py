@@ -2,159 +2,11 @@ import solara
 import reacton.ipyvuetify as rv
 
 from hubbleds.viewers.hubble_dotplot import HubbleDotPlotView, HubbleDotPlotViewer
-
-import numpy as np
-
 from glue.core import Data
-
 import numpy as np
-import plotly.graph_objects as go
-from plotly.basedatatypes import BaseTraceType
-from plotly.callbacks import Points, InputDeviceState
 from typing import Callable, Optional, List, cast
+from .bin_highligher import BinHighlighter
 
-
-
-class BinHighlighter:
-    def __init__(self, viewer):
-        self.viewer = viewer
-        self.hover_callback = None
-        self.unhover_callback = None
-        self.enabled = False
-        self.use_selection_layer = True
-
-    def setup_bin_highlight(self,
-                            color: str = 'rgba(126,126,126,0.5)',
-                            line_color: str | None = 'white',
-                            line_width: int = 1,
-                            bin_width: float = 0.98,
-                            on_hover: Optional[Callable] = None,
-                            on_unhover: Optional[Callable] = None,
-                            use_selection_layer: bool = True,
-                            selection_bin_width: float = 0.98,
-                            only_show_with_data: bool = False) -> None:
-        if not hasattr(self.viewer, 'selection_layer'):
-            return
-
-        bin_edges = self.viewer.state.bins
-        ymax = self.viewer.state.y_max
-
-        bins = (bin_edges[0:-1] + bin_edges[1:]) / 2
-        dx = bin_edges[1] - bin_edges[0]
-
-        if only_show_with_data:
-            keep = np.full_like(bins, False, dtype=bool)
-            for layer in self.viewer.state.layers:
-                if hasattr(layer, 'histogram'):
-                    data = layer.histogram[1]
-                    keep = keep | (data > 0)
-            bins = bins[keep]
-
-        def nearest_bin(x: float) -> float:
-            return bins[np.argmin(np.abs(x - bins))]
-
-        def hover_trace(x: float = 0) -> go.Bar:
-            return go.Bar(
-                name='hover_trace',
-                meta='hover_trace_meta',
-                x=[nearest_bin(x)],
-                y=[ymax],
-                width=dx * bin_width,
-                marker={
-                    'color': color,
-                    'line': {
-                        'color': line_color,
-                        'width': line_width
-                    }
-                },
-                hoverinfo='skip',
-                zorder=0,
-                visible=False,
-                showlegend=False
-            )
-
-        self.viewer.figure.add_trace(hover_trace())
-
-        def on_hover_callback(trace: BaseTraceType, points: Points, state: InputDeviceState) -> None:
-            print('Hover')
-            if len(points.xs) == 0:
-                return
-            old_bar = next(self.viewer.figure.select_traces({'meta': 'hover_trace_meta'}))
-            if old_bar is not None:
-                old_bar.x = [nearest_bin(points.xs[0])]
-                old_bar.visible = True
-                if on_hover is not None:
-                    on_hover(trace, points, state, old_bar)
-
-        def on_unhover_callback(trace: BaseTraceType, points: Points, state: InputDeviceState) -> None:
-            print('Unhover')
-            if len(points.xs) == 0:
-                print('No points')
-                old_bar = next(self.viewer.figure.select_traces({'meta': 'hover_trace_meta'}))
-                if old_bar is not None:
-                    old_bar.visible = False
-                    if on_unhover is not None:
-                        on_unhover(trace, points, state, old_bar)
-
-        if use_selection_layer:
-            self.viewer.selection_layer.on_hover(on_hover_callback)
-            self.viewer.selection_layer.on_unhover(on_unhover_callback)
-        else:
-            bin_layer = go.Bar(
-                name='all_bins',
-                meta='all_bins_meta',
-                x=bins,
-                y=[ymax]*len(bins),
-                width=dx * selection_bin_width,
-                marker={'color': 'rgba(0,0,0,0)', 'line': {'color': 'rgba(0,0,0,1)'}},
-                hoverinfo='none',
-                zorder=0,
-                visible=True,
-                showlegend=False
-            )
-            self.viewer.figure.add_trace(bin_layer)
-            bin_layer = next(self.viewer.figure.select_traces({'meta': 'all_bins_meta'}))
-            bin_layer.on_hover(on_hover_callback)
-            bin_layer.on_unhover(on_unhover_callback)
-
-        self.hover_callback = on_hover_callback
-        self.unhover_callback = on_unhover_callback
-        self.enabled = True
-
-    def turn_off_bin_highlight(self):
-        if not hasattr(self.viewer, 'selection_layer') or self.viewer is None:
-            return
-        print('Turning off bin highlight')
-        bin_layer = next(self.viewer.figure.select_traces({'meta': 'all_bins_meta'}), None)
-
-        if self.hover_callback in self.viewer.selection_layer._hover_callbacks:
-            print('Removing hover callback from selection layer')
-            index = self.viewer.selection_layer._hover_callbacks.index(self.hover_callback)
-            self.viewer.selection_layer._hover_callbacks.pop(index)
-            if bin_layer and self.hover_callback in bin_layer._hover_callbacks:
-                print('Removing hover callback from bin layer')
-                index = bin_layer._hover_callbacks.index(self.hover_callback)
-                bin_layer._hover_callbacks.pop(index)
-                bin_layer.hoverinfo = 'skip'
-
-        if self.unhover_callback in self.viewer.selection_layer._unhover_callbacks:
-            print('Removing unhover callback from selection layer')
-            index = self.viewer.selection_layer._unhover_callbacks.index(self.unhover_callback)
-            self.viewer.selection_layer._unhover_callbacks.pop(index)
-            if bin_layer and self.unhover_callback in bin_layer._unhover_callbacks:
-                print('Removing unhover callback from bin layer')
-                index = bin_layer._unhover_callbacks.index(self.unhover_callback)
-                bin_layer._unhover_callbacks.pop(index)
-                bin_layer.hoverinfo = 'skip'
-
-        traces = list(self.viewer.figure.data)
-        for trace_meta in ['hover_trace_meta', 'all_bins_meta']:
-            trace = next(self.viewer.figure.select_traces({'meta': trace_meta}), None)
-            if trace and trace in traces:
-                idx = traces.index(trace)
-                traces.pop(idx)
-        self.viewer.figure.data = tuple(traces)
-        self.enabled = False
 
 @solara.component
 def TestViewer(gjapp, 
@@ -163,14 +15,46 @@ def TestViewer(gjapp,
                use_selection_layer: solara.Reactive[bool] | bool = False,
                on_click_callback = None, 
                on_hover_callback = None,
-               nbins = 5): #
+               nbins: solara.Reactive[int] | int = 5,
+               bin_width: solara.Reactive[float] | float = 1,):
+    """
+    A Solara component to create a test viewer with bin highlighting.
 
+    Args:
+        gjapp: The Glue Jupyter application object.
+        data: Optional Glue Data object.
+        highlight_bins: Boolean or reactive value to enable bin highlighting.
+        use_selection_layer: Boolean or reactive value to use the selection layer.
+        on_click_callback: Optional callback to be called on click.
+        on_hover_callback: Optional callback to be called on hover.
+        nbins: Integer or reactive value for the number of bins.
+    
+    Example:
+        ```python
+        import solara
+        from glue.core import Data
+        from your_module import TestViewer
+
+        # Create a Glue Jupyter application object
+        gjapp = ...
+
+        # Create some data
+        data = Data(label='Example Data', x=[1, 2, 3, 4, 5])
+
+        # Create the TestViewer component
+        viewer = TestViewer(gjapp, data=data, highlight_bins=True, use_selection_layer=True)
+
+        # Render the viewer in a Solara app
+        solara.render(viewer)
+        ```
+    """
     viewer_container = rv.Html(tag='div', style_=f"width: 100%; height: 100%")
     use_selection_layer = solara.use_reactive(use_selection_layer)
     highlight_bins = solara.use_reactive(highlight_bins)
     bin_highlighter: solara.Reactive[BinHighlighter | None] = solara.use_reactive(None)
     nbins = solara.use_reactive(nbins)
-    callbacks = solara.use_reactive([])
+    bin_width = solara.use_reactive(bin_width)
+
     
     def _viewer_setup(data):
         print('Setting up viewer')
@@ -217,34 +101,42 @@ def TestViewer(gjapp,
         new_update_selection()
     
         # Create BinHighlighter instance
-        bin_highlighter.set(BinHighlighter(viewer))
+        bin_highlighter.set(BinHighlighter(viewer, 
+                                           on_hover_callback=on_hover_callback,
+                                           bin_width=bin_width.value, 
+                                            use_selection_layer=use_selection_layer.value,
+                                            selection_bin_width=.5,
+                                            show_bins_with_data_only=False,
+                                            show_all_bins=True,
+                                            setup_selection_layer=False
+                                           ))
 
         def toggle_bin_highlight(turn_on: bool):
-            print('Toggling bin highlight', turn_on)
             if bin_highlighter.value is None:
                 return
             if turn_on:
-                bin_highlighter.value.setup_bin_highlight(
-                    on_hover=on_hover_callback, 
-                    bin_width=.3, 
-                    use_selection_layer=use_selection_layer.value,
-                    selection_bin_width=.3,
-                    only_show_with_data=False
-                )
+                bin_highlighter.value.setup_bin_highlight()
             else:
                 bin_highlighter.value.turn_off_bin_highlight()
         
         toggle_bin_highlight(highlight_bins.value)
-        highlight_bins.subscribe(toggle_bin_highlight)
-        def on_use_selection_layer(value: bool):
-            if bin_highlighter.value is None:
-                return
-            if bin_highlighter.value.enabled:
-                bin_highlighter.value.turn_off_bin_highlight()
-                toggle_bin_highlight(highlight_bins.value)
-            else:
-                toggle_bin_highlight(highlight_bins.value)
+        highlight_bins.subscribe(toggle_bin_highlight)      
+          
+        def on_use_selection_layer(value):
+            if bin_highlighter.value is not None:
+                bin_highlighter.value.use_selection_layer = value
+                bin_highlighter.value.redraw()
         use_selection_layer.subscribe(on_use_selection_layer)
+        
+        def on_nbins_change(value):
+            if bin_highlighter.value is not None:
+                bin_highlighter.value.redraw()
+        nbins.subscribe(on_nbins_change)
+        
+        def on_bin_width_change(value):
+            if bin_highlighter.value is not None:
+                bin_highlighter.value.set_bin_width(value)
+        bin_width.subscribe(on_bin_width_change)
         
         def cleanup():
                 vc.children = ()
@@ -254,7 +146,6 @@ def TestViewer(gjapp,
 
 
     
-        
 
     
     solara.use_effect(lambda :_viewer_setup(data), dependencies=[])
