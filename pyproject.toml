@@ -3,7 +3,7 @@ requires = ["hatchling >=0.25"]
 build-backend = "hatchling.build"
 
 [project]
-name = "solara_portal"
+name = "test_highlight"
 license = {file = "LICENSE"}
 classifiers = ["License :: OSI Approved :: MIT License"]
 dynamic = ["version", "description"]
@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [tool.hatch.version]
-path = "solara_portal/__init__.py"
+path = "test_highlight/__init__.py"
 
 
 

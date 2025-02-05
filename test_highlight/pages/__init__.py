@@ -129,7 +129,7 @@ def Page():
             with solara.Card(style='width: 500px'):
                 solara.SliderInt(label='Number of Bins', value=nbins, min=1, max=100)
                 solara.SliderFloat(label='Bin Width', value=bin_width, min=0.1, max=1)
-            PlotlyHighlighting()
+            # PlotlyHighlighting()
 
     with solara.Card(margin=10):
         if show_dotplot.value:
