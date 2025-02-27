@@ -3,7 +3,14 @@ export default {
 
   data() {
     return {
-      el: []
+      el: [],
+      hoverDuration: 0,
+      debounceTimeout: null,
+      isMouseInside: false,
+      // create a map to store the eventhandler for removal
+      eventHandlers: new Map(),
+      originalStyle: new Map()
+      
     }
   },
 
@@ -15,55 +22,74 @@ export default {
   methods: {
     getElements() {
       this.el = document.querySelectorAll('g.cartesianlayer > g > g.plot > g.barlayer2.mlayer > g > g > g > path')
-      console.log(this.el)
+      console.log(`Got ${this.el.length} elements`)
+      this.el.forEach((element, index) => {
+        element.style.pointerEvents = 'auto';
+        element.setAttribute('data-index', index);
+        this.originalStyle.set(element, {style: element.style.cssText} );
+      });
     },
-
+    
     applyListeners() {
       console.log('apply listeners')
       this.el.forEach(element => {
-        // Enable pointer events for this element and its ancestors
-        // enablePointerEvents(element);
-        // element.style.pointerEvents = 'auto';
-        // console.log(element)
-
-        let i = 0
-        // Add mouseover event listener
         let isMouseInside = false;
         let debounceTimeout;
+        let hoverDuration = 0;
 
         // Add mouseenter event listener
-        element.addEventListener('mouseenter', function () {
+        const enterHandler = () => {
           if (!isMouseInside) {
+            hoverDuration = performance.now();
             isMouseInside = true;
-            console.log('entered');
             element.style.fill = 'rgb(0, 0, 0)';
             element.style.fillOpacity = '0.5';
             element.style.stroke = 'rgb(120, 120, 255)';
             element.style.strokeOpacity = '1';
           }
-        });
+        }
+        
+        this.eventHandlers.set(element, { enterHandler });
+        element.addEventListener('mouseenter', enterHandler);
 
         // Add mouseleave event listener
-        element.addEventListener('mouseleave', function () {
+        const leaveHandler = () => {
           if (isMouseInside) {
+            const diff = performance.now() - hoverDuration;
+            const debounceTime = diff > 500 ? 100 : 0;
             clearTimeout(debounceTimeout);
             debounceTimeout = setTimeout(() => {
               isMouseInside = false;
-              console.log('leave');
-              element.style.fill = 'none'; // Revert to initial styles
-              element.style.fillOpacity = '0';
-              element.style.stroke = 'none';
-              element.style.strokeOpacity = '0';
-            }, 100); // Adjust the debounce time as needed
+              if (this.originalStyle.get(element) === undefined) {
+                element.style.fill = 'rgb(0,0,0)';
+                element.style.fillOpacity = '0';
+                element.style.stroke = 'rgb(0, 0, 0)';
+                element.style.strokeOpacity = '0';
+              }
+              element.style.cssText = this.originalStyle.get(element).style;
+            }, debounceTime); // Adjust the debounce time as needed
           }
-        });
+        }
+        
+        this.eventHandlers.set(element, { leaveHandler });
+        element.addEventListener('mouseleave', leaveHandler );
 
-        // Apply styles
-
+      });
+      
+    },
+    
+    removeListeners() {
+      this.el.forEach(element => {
+        if (this.eventHandlers.size === 0) return;
+        enterHandler = this.eventHandlers.get(element).enterHandler;
+        leaveHandler = this.eventHandlers.get(element).leaveHandler;
+        element.removeEventListener('mouseenter', enterHandler);
+        element.removeEventListener('mouseleave', leaveHandler);
       });
     },
 
     redo() {
+      this.removeListeners()
       this.getElements()
       this.applyListeners()
     }
@@ -74,6 +100,7 @@ export default {
 
 <template>
   <v-col>
+    Plotly Highlighting
     <v-btn variant="outlined" @click="redo">Redo</v-btn>
   </v-col>
 </template>

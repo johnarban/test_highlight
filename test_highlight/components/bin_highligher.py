@@ -4,8 +4,9 @@ from plotly.basedatatypes import BaseTraceType
 from plotly.callbacks import Points, InputDeviceState
 from typing import Callable, Optional
 
+from .BinManager import BinManager
 
-class BinHighlighter:
+class BinHighlighter(BinManager):
     """
     Example:
         ```python
@@ -15,7 +16,7 @@ class BinHighlighter:
         self.bin_highlighter = BinHighlighter(viewer,
                                            line_color='rgba(120, 120, 255, 1)',
                                            fill_color='rgba(0,0,0,.5)',
-                                           show_all_bins=False, # don't overlay all bins
+                                           visible_bins=False, # don't overlay all bins
                                            show_bins_with_data_only=False,
                                            use_selection_layer=True,
                                            setup_selection_layer=False # assume glue plots all have a selection layer
@@ -45,8 +46,7 @@ class BinHighlighter:
         bin_width: float = 1.0,
         selection_bin_width: float = 1.0,
         show_bins_with_data_only: bool = False,
-        nearest_in_bin: bool = True,
-        show_all_bins: bool = False,
+        visible_bins: bool = False,
         setup_selection_layer: bool = False,
         highlight_on_click: bool = False
     ):
@@ -89,23 +89,30 @@ class BinHighlighter:
         nearest_in_bin : bool, optional
             When True, only highlights the bin currently under the cursor without snapping to
             the nearest bin unless it contains data. Default is True.
-        show_all_bins : bool, optional
+        visible_bins : bool, optional
             If True, displays all bins with a black outline, useful for debugging purposes.
             Default is False.
         setup_selection_layer : bool, optional
             If True, sets up the necessary hover and click modes for the selection layer.
             This should be used when the selection layer isn't already configured. Default is False.
         """
+        super().__init__(viewer,
+                            bin_width=bin_width,
+                            selection_bin_width=selection_bin_width,
+                            show_bins_with_data_only=show_bins_with_data_only,
+                            visible_bins=visible_bins,
+                            use_selection_layer=use_selection_layer,
+                            )
+        self.setup_bin_layer()
         
-        self.viewer = viewer
+        
+        # self.viewer = viewer
         self.enabled = False
 
         self.hover_callbacks = [on_hover_callback] if on_hover_callback is not None else []
         self.unhover_callbacks = [on_unhover_callback] if on_unhover_callback is not None else []
 
-        self.bins = None
-        self.dx = None
-        self.ymax = None
+        
 
         self.fill_color = fill_color
         self.line_color = line_color
@@ -113,36 +120,15 @@ class BinHighlighter:
         
         # I don't know if all viewers with histograms have 
         # a selection layer. I think, but just in case
-        if not hasattr(viewer, 'selection_layer'):
-            self.use_selection_layer = False
-        else:
-            self.use_selection_layer = use_selection_layer
+        if use_selection_layer and not hasattr(viewer, 'selection_layer'):
+            raise AttributeError(f'Can not setup the selection layer as viewer {viewer} has no selection layer')
         
-        self.bin_width = bin_width
-        self.selection_bin_width = selection_bin_width
-        self.only_show_with_data = show_bins_with_data_only
-        self.show_all_bins = show_all_bins
-        self.setup_selection_layer = setup_selection_layer
+        
         self.highlight_on_click = highlight_on_click
         self.only_show = only_show
+        
+        self._setup_selection_layer = setup_selection_layer
 
-
-    def _calculate_bins(self):
-        bin_edges = self.viewer.state.bins
-        if bin_edges is None:
-            return
-        self.bins = (bin_edges[0:-1] + bin_edges[1:]) / 2
-        self.dx = bin_edges[1] - bin_edges[0]
-        self.ymax = self.viewer.state.y_max
-
-    def nearest_bin(self, x: float) -> float | None:
-        if self.bins is None:
-            return x
-        nearest = self.bins[np.argmin(np.abs(x - self.bins))]
-        if np.abs(x - nearest) > self.dx:
-            return None
-        else:
-            return nearest
 
     def clear_callbacks(self):
         """Clear all hover and unhover callbacks"""
@@ -156,7 +142,7 @@ class BinHighlighter:
             name="hover_trace",
             meta="hover_trace_meta",
             x=[self.nearest_bin(x)],
-            y=[self.ymax],
+            y=[self.ymax * 1.2 if self.ymax is not None else self.ymax],
             width=self.dx * self.bin_width,
             marker={"color": self.fill_color, "line": {"color": self.line_color, "width": self.line_width}},
             hoverinfo="skip",
@@ -165,50 +151,7 @@ class BinHighlighter:
             showlegend=False,
         )
     
-    def _create_bin_layer(self, marker_style) -> go.Bar | None:
-        if self.dx is None or self.bins is None:
-            raise ValueError("Bin layer creation failed: Bins or dx is None")
-        return go.Bar(
-                name="all_bins",
-                meta="all_bins_meta",
-                x=self.bins,
-                y=[self.ymax] * len(self.bins),
-                width=self.dx * self.selection_bin_width,
-                marker=marker_style,
-                hoverinfo="skip" if self.use_selection_layer else None,  # must capture the hover. skip will not work
-                zorder=1000,
-                visible=True,
-                showlegend=False,
-            )
     
-    def _filter_bins(self):
-        if self.bins is None: return
-        
-        keep = np.full_like(self.bins, False, dtype=bool)
-        for layer in self.viewer.state.layers:
-            if hasattr(layer, "histogram"):
-                data = layer.histogram[1]
-                keep = keep | (data > 0)
-        bins = self.bins[keep]
-        self.bins = bins
-    
-    def setup_bin_layer(self):
-        self._calculate_bins()
-        if self.bins is None or self.dx is None:
-            return
-
-        if self.only_show_with_data:
-            self._filter_bins()
-            
-        if self.show_all_bins:
-            marker_style = {"color": "rgba(0,0,0,0)", "line": {"color": "rgba(0,0,0,0)"}}
-        else:
-            marker_style = {"color": "rgba(0,0,0,0)", "line": {"color": "rgba(0,0,0,0)"}}
-        
-        if self.show_all_bins or not self.use_selection_layer:
-            self.viewer.figure.add_trace(self._create_bin_layer(marker_style = marker_style))
-
-        self.enabled = True
 
     def setup_bin_highlight(self, on_hover_callback: Optional[Callable] = None) -> None:
         """
@@ -217,21 +160,17 @@ class BinHighlighter:
         Args:
             on_hover_callback: Optional callback to be called on hover.
         """
-        
         if self.only_show:
-            self.setup_bin_layer()
+            self.enabled = True
             return
         
-        if not hasattr(self.viewer, "selection_layer"):
-            return
-
-        self._calculate_bins()
+        if self.use_selection_layer and not hasattr(self.viewer, "selection_layer"):
+            raise AttributeError(f'Can not setup the selection layer as viewer {self.viewer} has no selection layer')
 
         if self.bins is None or self.dx is None:
             return
 
-        if self.only_show_with_data:
-            self._filter_bins()
+        
 
         # Add the trace to be shown on hover
         self.viewer.figure.add_trace(self._create_hover_trace())
@@ -241,21 +180,16 @@ class BinHighlighter:
             self.hover_callbacks.append(on_hover_callback)
         
         if self.use_selection_layer:
-            if self.setup_selection_layer:
-                self.add_selection_layer()
+            if self._setup_selection_layer:
+                self.setup_selection_layer()
             if self.highlight_on_click:
                 self.viewer.selection_layer.on_click(self._on_hover)
             else:
                 self.viewer.selection_layer.on_hover(self._on_hover)
                 self.viewer.selection_layer.on_unhover(self._on_unhover)
         
-        if self.show_all_bins:
-            marker_style = {"color": "rgba(0,0,0,0)", "line": {"color": "rgba(0,0,0,1)"}}
-        else:
-            marker_style = {"color": "rgba(0,0,0,0)", "line": {"color": "rgba(0,0,0,0)"}}
         
-        if self.show_all_bins or not self.use_selection_layer:
-            self.viewer.figure.add_trace(self._create_bin_layer(marker_style = marker_style))
+        if self.visible_bins or not self.use_selection_layer:
             bin_layer = self.bin_layer
             if not self.use_selection_layer and bin_layer is not None:
                 bin_layer.on_hover(self._on_hover)
@@ -263,25 +197,22 @@ class BinHighlighter:
 
         self.enabled = True
 
-    def redraw(self):
-        """Redwaw the bin highlight"""
-        if self.enabled:
-            self.turn_off_bin_highlight()
-            self.setup_bin_highlight()
+    
 
-    def add_selection_layer(self):
+    def setup_selection_layer(self):
         if not hasattr(self.viewer, 'selection_layer'):
             raise AttributeError(f'Can not setup the selection layer as viewer {self.viewer} has not selection layer')
+        resolution = 200
         def new_update_selection(viewer=self.viewer):
             state = viewer.state
             x0 = state.x_min
-            dx = (state.x_max - state.x_min) * 0.005
+            dx = (state.x_max - state.x_min) * (1/resolution)
             y0 = state.y_min
             dy = (state.y_max - state.y_min) * 2
             viewer.selection_layer.update(x0=x0 - dx, dx=dx, y0=y0, dy=dy)
 
         self.viewer.figure.update_layout(clickmode="event", hovermode="closest", showlegend=False)
-        self.viewer.selection_layer.update(visible=True, z=[list(range(201))], opacity=.5, coloraxis="coloraxis")
+        self.viewer.selection_layer.update(visible=True, z=[list(range(resolution + 1))], opacity=0, coloraxis="coloraxis")
         self.viewer.figure.update_coloraxes(showscale=False)
         new_update_selection()
         self.viewer._update_selection_layer_bounds = new_update_selection
@@ -290,10 +221,7 @@ class BinHighlighter:
     def highlight_trace(self) -> Optional[go.Bar]:
         return next(self.viewer.figure.select_traces({"meta": "hover_trace_meta"}), None)
 
-    @property
-    def bin_layer(self) -> Optional[go.Bar]:
-        return next(self.viewer.figure.select_traces({"meta": "all_bins_meta"}), None)
-
+    
     def _on_hover(self, trace: BaseTraceType, points: Points, state: InputDeviceState) -> None:
         if len(points.xs) > 0:  # hover condition
             if self.highlight_trace:  # hover condition
@@ -312,7 +240,13 @@ class BinHighlighter:
                     # run unhover callbacks
                     for callback in self.unhover_callbacks:
                         callback(trace, points, state)
+    
+    def turn_on_bin_highlight(self):
+        if self.enabled:
+            return
+        self.setup_bin_highlight()
 
+    
     def turn_off_bin_highlight(self):
         if self.highlight_trace:
             traces_to_keep = lambda t: t != self.highlight_trace
@@ -320,8 +254,7 @@ class BinHighlighter:
                 filter(traces_to_keep, self.viewer.figure.data)
             )
 
-        if self.bin_layer:
-            self.viewer.figure.data = [t for t in self.viewer.figure.data if t != self.bin_layer]
+        self.turn_off_bins()
 
         if hasattr(self.viewer, "selection_layer"):
             self.viewer.selection_layer._hover_callbacks = [cb for cb in self.viewer.selection_layer._hover_callbacks if cb != self._on_hover]
@@ -335,3 +268,15 @@ class BinHighlighter:
             self.bin_layer.visible = not self.bin_layer.visible
         else:
             self.bin_layer.visible = show
+    
+    def set_visible_bin_width(self, width: float):
+        self.selection_bin_width = width
+        self.redraw()
+        
+    def redraw(self):
+        """Redwaw the bin highlight"""
+        if self.enabled:
+            self.turn_off_bin_highlight()
+            # self.setup_bin_layer()
+            self.redraw_bins()
+            self.setup_bin_highlight()

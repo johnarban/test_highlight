@@ -25,6 +25,7 @@ def Page():
     line_marker_at = solara.use_reactive(0)
     hover_location = solara.use_reactive(0)
     highlight_bins = solara.use_reactive(True)
+    only_show_bins = solara.use_reactive(False)
     
     num_clicks = solara.use_reactive(0)
     hover_count = solara.use_reactive(0)
@@ -36,6 +37,8 @@ def Page():
     bin_width = solara.use_reactive(1.0)
     
     use_selection_layer = solara.use_reactive(True)
+    
+    use_js = solara.use_reactive(False)
     
     def _glue_setup():
         glue_app = JupyterApplication()
@@ -72,12 +75,15 @@ def Page():
             link_seed_data(glue_app)
         return glue_app
     
-    app = solara.use_memo(_glue_setup)
+    app = solara.use_memo(_glue_setup)  # type: ignore
     
     def click_callback(*args, **kwargs):
         print('clicked!')
-        points = args[0]
-        if len(points.xs) > 0:
+        if len(args) == 3:
+            points = args[2]
+        else:
+            points = args[0]
+        if hasattr(points, 'xs') and len(points.xs) > 0:
             print(points.xs)
             line_marker_at.value = points.xs[0]
         num_clicks.value += 1
@@ -105,15 +111,23 @@ def Page():
             solara.Switch(
                 label = 'Vertical Line Visible',
                 value = vertical_line_visible
-                )
+                ) # type: ignore
             solara.Switch(
                 label = 'Use Selection Layer',
                 value = use_selection_layer
-                )
+                ) # type: ignore
             solara.Switch(
                 label = 'Highlight Bins',
                 value = highlight_bins
-                )
+                ) # type: ignore
+            solara.Switch(
+                label = 'Only Show Bins',
+                value = only_show_bins
+                ) # type: ignore
+            solara.Switch(
+                label = 'Use Plotly Highlighter',
+                value = use_js
+                ) # type: ignore
             solara.Text(f'Number of Clicks: {num_clicks.value}')
             solara.Text(f'Number of Hovers: {hover_count.value}')
             solara.Text(f'Click is at: {line_marker_at.value}')
@@ -121,15 +135,17 @@ def Page():
             solara.Switch(
                 label = "Show dotplot",
                 value = show_dotplot
-            )
+            ) # type: ignore
             # create a circular div that is green or red  if clicked or not
-            with rv.Html(tag='span',style_="display: flex; gap:15px; align-items: center;"):
+            with rv.Html(tag='span',style_="display: flex; gap:15px; align-items: center;"):  # type: ignore
                 solara.Text('Hovering: ')
-                rv.Html(tag='div', style_=f"width: 15px; height: 15px; border-radius: 50%; background-color: {'green' if is_hovering.value else 'red'}")
+                rv.Html(tag='div', style_=f"width: 15px; height: 15px; border-radius: 50%; background-color: {'green' if is_hovering.value else 'red'}")  # type: ignore
             with solara.Card(style='width: 500px'):
                 solara.SliderInt(label='Number of Bins', value=nbins, min=1, max=100)
-                solara.SliderFloat(label='Bin Width', value=bin_width, min=0.1, max=1)
-            # PlotlyHighlighting()
+                solara.SliderFloat(label='Bin Width', value=bin_width, min=0.1, max=1)  # type: ignore
+            
+            PlotlyHighlighting()
+            
 
     with solara.Card(margin=10):
         if show_dotplot.value:
@@ -156,7 +172,9 @@ def Page():
                        on_click_callback=click_callback,
                        on_hover_callback=hover_callback,
                        highlight_bins=highlight_bins,
+                       only_show_bins=only_show_bins,
                        nbins=nbins,
-                         bin_width=bin_width,
+                        bin_width=bin_width,
+                        use_python_highlighing=not use_js.value,
                        )
         

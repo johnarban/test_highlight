@@ -47,6 +47,8 @@ def this_or_default(arr, default, index):
 
 _original_update_data = DotplotScatterLayerArtist._update_data
 
+from .BinManager import BinManager
+
 @solara.component
 def DotplotViewer(
     gjapp: JupyterApplication, 
@@ -106,15 +108,15 @@ def DotplotViewer(
     # bin_highlighter: Reactive[Optional[BinHighlighter]] = solara.use_reactive(None)
     highlight_bins = solara.use_reactive(highlight_bins)
     
-    with rv.Card() as main:
-        with rv.Toolbar(dense=True, class_="toolbar"):
-            with rv.ToolbarTitle(class_="toolbar toolbar-title"):
-                title_container = rv.Html(tag="div")
+    with rv.Card() as main: # type: ignore
+        with rv.Toolbar(dense=True, class_="toolbar"): # type: ignore
+            with rv.ToolbarTitle(class_="toolbar toolbar-title"): # type: ignore # type: ignore
+                title_container = rv.Html(tag="div") # type: ignore # type: ignore
 
-            rv.Spacer()
-            toolbar_container = rv.Html(tag="div")
+            rv.Spacer() # type: ignore # type: ignore
+            toolbar_container = rv.Html(tag="div") # type: ignore # type: ignore
 
-        viewer_container = rv.Html(tag="div", style_=f"width: 100%; height: {height}px", class_="mb-4")
+        viewer_container = rv.Html(tag="div", style_=f"width: 100%; height: {height}px", class_="mb-4") # type: ignore
         
         def _line_ids_for_viewer(viewer: PlotlyBaseView):
             line_ids = []
@@ -134,7 +136,7 @@ def DotplotViewer(
                 viewer.figure.layout.shapes = shapes
 
         
-        def _add_vertical_line(viewer: PlotlyBaseView, value: Number, color: str, label: str = None, line_ids: list[str] = []):
+        def _add_vertical_line(viewer: PlotlyBaseView, value: Number, color: str, label: str = None, line_ids: list[str] = []): # type: ignore
             line_id = str(uuid4())
             line_ids.append(line_id)
             viewer.figure.add_vline(x=value, line_color=color, line_width=2, name=line_id)
@@ -254,13 +256,13 @@ def DotplotViewer(
                 dotplot_view.state.title = title
     
             title_widget = solara.get_widget(title_container)
-            title_widget.children = (dotplot_view.state.title or "DOTPLOT VIEWER",)
+            title_widget.children = (dotplot_view.state.title or "DOTPLOT VIEWER",) # type: ignore
 
             toolbar_widget = solara.get_widget(toolbar_container)
-            toolbar_widget.children = (dotplot_view.toolbar,)
+            toolbar_widget.children = (dotplot_view.toolbar,) # type: ignore # type: ignore
 
             viewer_widget = solara.get_widget(viewer_container)
-            viewer_widget.children = (dotplot_view.figure_widget,)
+            viewer_widget.children = (dotplot_view.figure_widget,) # type: ignore
 
             # The auto sizing in the plotly widget only works if the height
             #  and width are undefined. First, unset the height and width,
@@ -329,7 +331,7 @@ def DotplotViewer(
                     dotplot_view.state.x_min = new_range[0]
                     dotplot_view.state.x_max = new_range[1]
                 else:
-                    new_range = [dotplot_view.state.x_min, dotplot_view.state.x_max]
+                    new_range = [dotplot_view.state.x_min, dotplot_view.state.x_max] # type: ignore # type: ignore
                 
                 # new_range = [dotplot_view.state.x_min, dotplot_view.state.x_max]
                 if (
@@ -348,7 +350,7 @@ def DotplotViewer(
             
             def _on_bounds_changed(*args):
                 logger.info("Bounds changed")
-                new_range = [dotplot_view.state.x_min, dotplot_view.state.x_max]
+                new_range = [dotplot_view.state.x_min, dotplot_view.state.x_max] # type: ignore
                 if (
                     not valid_two_element_array(x_bounds.value) or
                     not np.isclose(x_bounds.value, new_range).all()
@@ -362,32 +364,27 @@ def DotplotViewer(
                 if on_click_callback is not None:
                     on_click_callback(points)
             bin_highlighter = None
-            if not use_js:
-                bin_highlighter = BinHighlighter(dotplot_view,
-                                                line_color='rgba(120, 120, 255, 1)',
-                                                fill_color='rgba(0,0,0,.5)',
-                                                show_all_bins=False,
-                                                show_bins_with_data_only=True,
-                                                on_hover_callback=bin_on_hover,
-                                                use_selection_layer=True,
-                                                setup_selection_layer=False,
-                                                highlight_on_click=False,
-                                                )
-            else:                                    
-                bin_highlighter = BinHighlighter(
-                    dotplot_view,
-                    only_show = True,
-                    show_all_bins=True,
-                    show_bins_with_data_only=True,
-                    selection_bin_width=1
-                )
+
+
+            bin_highlighter = BinHighlighter(dotplot_view,
+                                            line_color='rgba(120, 120, 255, 1)',
+                                            fill_color='rgba(0,0,0,.5)',
+                                            visible_bins=True,
+                                            show_bins_with_data_only=True,
+                                            on_hover_callback=bin_on_hover,
+                                            use_selection_layer=True,
+                                            setup_selection_layer=False,
+                                            highlight_on_click=False,
+                                            only_show=use_js,
+                                            )
+
             def turn_off_bin_highlighter():
                 if bin_highlighter is not None:
                     bin_highlighter.turn_off_bin_highlight()
             def turn_on_bin_highlighter():
                 if bin_highlighter is not None:
-                    bin_highlighter.turn_off_bin_highlight()
-                    bin_highlighter.setup_bin_highlight()
+                    bin_highlighter.turn_on_bin_highlight()
+            
             def toggle_bin_highlighter(show = True):
                 if show:
                     turn_on_bin_highlighter()
@@ -417,7 +414,7 @@ def DotplotViewer(
 
             zoom_tool = dotplot_view.toolbar.tools['hubble:wavezoom']
             def on_zoom(bounds_old, bounds_new):
-                dotplot_view.state._update_bins()
+                dotplot_view.state._update_bins() # type: ignore # type: ignore
             zoom_tool.on_zoom = on_zoom
             
             
@@ -442,13 +439,14 @@ def DotplotViewer(
                 bin_highlighter.setup_bin_highlight()
             apply_zorder()
             
+            toggle_bin_highlighter(highlight_bins.value)
             highlight_bins.subscribe(toggle_bin_highlighter)
             
             viewer_data_log = ''.join([f"\n\t{l.layer.label}: {'visible' if l.visible else 'not visible'}" for l in dotplot_view.layers])            
             
             def cleanup():
                 for cnt in (title_widget, toolbar_widget, viewer_widget):
-                    cnt.children = ()
+                    cnt.children = () # type: ignore
 
                 for wgt in (dotplot_view.toolbar, dotplot_view.figure_widget):
                     # wgt.layout.close()
