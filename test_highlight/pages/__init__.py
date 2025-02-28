@@ -31,14 +31,14 @@ def Page():
     hover_count = solara.use_reactive(0)
     is_hovering = solara.use_reactive(False)
     
-    show_dotplot = solara.use_reactive(True)
+    show_dotplot = solara.use_reactive(False)
     
     nbins = solara.use_reactive(25)
     bin_width = solara.use_reactive(1.0)
     
     use_selection_layer = solara.use_reactive(True)
     
-    use_js = solara.use_reactive(False)
+    use_js = solara.use_reactive(True)
     
     def _glue_setup():
         glue_app = JupyterApplication()
@@ -107,7 +107,7 @@ def Page():
     
     with solara.Column(margin=10):
         
-        with solara.Column():
+        with solara.Div(style={'display': 'flex', 'flex-wrap': 'wrap', 'gap': '1rem', 'justify-content': 'space-between'}):
             solara.Switch(
                 label = 'Vertical Line Visible',
                 value = vertical_line_visible
@@ -144,7 +144,6 @@ def Page():
                 solara.SliderInt(label='Number of Bins', value=nbins, min=1, max=100)
                 solara.SliderFloat(label='Bin Width', value=bin_width, min=0.1, max=1)  # type: ignore
             
-            PlotlyHighlighting()
             
 
     with solara.Card(margin=10):
