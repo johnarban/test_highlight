@@ -7,6 +7,7 @@ import numpy as np
 from typing import Callable, Optional, List, cast
 from .bin_highligher import BinHighlighter
 from .BinManager import BinManager
+from .PlotlyHighlighting import _PlotlyHighlighting
 
 @solara.component
 def TestViewer(gjapp, 
@@ -58,6 +59,7 @@ def TestViewer(gjapp,
     nbins = solara.use_reactive(nbins)
     bin_width = solara.use_reactive(bin_width)
     only_show_bins = solara.use_reactive(only_show_bins)
+    viewer_class = solara.use_reactive('')
 
     
     def _viewer_setup(data):
@@ -74,6 +76,7 @@ def TestViewer(gjapp,
         viewer = gjapp.new_data_viewer(HubbleDotPlotView, data=data, show=True)
         vc = solara.get_widget(viewer_container)
         vc.children = (viewer.figure_widget,) # type: ignore
+        viewer_class.set(viewer._unique_class)
         
         viewer.state.hist_n_bin = nbins.value
         nbins.subscribe(lambda x: setattr(viewer.state, 'hist_n_bin', x))
@@ -157,6 +160,14 @@ def TestViewer(gjapp,
     
     solara.use_effect(lambda :_viewer_setup(data), dependencies=[only_show_bins.value, use_python_highlighing])
     
+    def add_highlighting():
+        print('adding highlighting', viewer_class.value)
+        pl = _PlotlyHighlighting(viewer_id=viewer_class.value)
+        vc = solara.get_widget(viewer_container)
+        vc.children = (pl, ) + tuple(vc.children) # type: ignore
+    
+    # solara.use_effect(add_highlighting, dependencies=[viewer_class.value])
+    viewer_class.subscribe(lambda x: add_highlighting())
     
     return viewer_container
 

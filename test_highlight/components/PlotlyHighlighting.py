@@ -1,10 +1,25 @@
 import solara
 from .BinManager import BinManager
+from ipyvuetify import VuetifyTemplate
+import os
+from traitlets import Unicode
 
-@solara.component_vue('PlotlyHighlighting.vue')
-def PlotlyHighlighting():
-    pass
-    # def __init__(self, viewer):
-    #     self.bin_manager = BinManager(viewer = self.viewer, use_selection_layer=False)
-    #     self.bin_manager.setup_bin_layer()
+class _PlotlyHighlighting(VuetifyTemplate):
+    template_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "PlotlyHighlighting.vue"))
+    viewer_id = Unicode().tag(sync=True)
     
+    def __init__(self, viewer_id = '', *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.viewer_id = viewer_id
+        pass
+
+
+@solara.component
+def PlotlyHighlighting():
+    _PlotlyHighlighting.element()
+    
+    
+# @solara.component_vue('PlotlyHighlighting.vue')
+# def PlotlyHighlighting():
+#     pass
+
