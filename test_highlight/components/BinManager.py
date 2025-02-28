@@ -104,8 +104,9 @@ class BinManager:
     
     def turn_off_bins(self):
         if self.bin_layer:
-            self.viewer.figure.data = [t for t in self.viewer.figure.data if t != self.bin_layer]
-        self.traces_added = False
+            traces_to_keep = lambda t: t != self.bin_layer and getattr(t, "meta", None) != "all_bins_meta"
+            self.viewer.figure.data = tuple(filter(traces_to_keep, self.viewer.figure.data))
+            self.traces_added = False
     
     @debounce(.1)
     def redraw_bins(self):

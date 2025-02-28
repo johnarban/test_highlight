@@ -6,6 +6,8 @@ from typing import Callable, Optional
 
 from .BinManager import BinManager
 from cosmicds.utils import debounce
+from time import sleep
+
 class BinHighlighter(BinManager):
     """
     Example:
@@ -249,7 +251,8 @@ class BinHighlighter(BinManager):
     
     def turn_off_bin_highlight(self):
         if self.highlight_trace:
-            traces_to_keep = lambda t: t != self.highlight_trace
+            # Get all traces except the highlight trace
+            traces_to_keep = lambda t: t != self.highlight_trace and getattr(t, "meta", None) != "hover_trace_meta"
             self.viewer.figure.data = tuple(
                 filter(traces_to_keep, self.viewer.figure.data)
             )
@@ -261,6 +264,8 @@ class BinHighlighter(BinManager):
             self.viewer.selection_layer._unhover_callbacks = [cb for cb in self.viewer.selection_layer._unhover_callbacks if cb != self._on_unhover]
 
         self.enabled = False
+    
+    
         
     def show_hide_all_bins(self, show = None):
         if self.bin_layer is None: return
@@ -278,6 +283,5 @@ class BinHighlighter(BinManager):
         """Redwaw the bin highlight"""
         if self.enabled:
             self.turn_off_bin_highlight()
-            # self.setup_bin_layer()
             self.redraw_bins()
             self.setup_bin_highlight()
