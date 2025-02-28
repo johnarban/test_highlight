@@ -4,7 +4,7 @@ from plotly.basedatatypes import BaseTraceType
 from plotly.callbacks import Points, InputDeviceState
 from typing import Callable, Optional
 from time import sleep
-
+from cosmicds.utils import debounce
 
 class BinManager:
     """Base class for managing histogram bins"""
@@ -107,7 +107,7 @@ class BinManager:
             self.viewer.figure.data = [t for t in self.viewer.figure.data if t != self.bin_layer]
         self.traces_added = False
     
-
+    @debounce(.1)
     def redraw_bins(self):
         if self.bin_layer is not None:
             self.turn_off_bins()

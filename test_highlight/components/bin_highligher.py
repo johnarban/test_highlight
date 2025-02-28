@@ -5,7 +5,7 @@ from plotly.callbacks import Points, InputDeviceState
 from typing import Callable, Optional
 
 from .BinManager import BinManager
-
+from cosmicds.utils import debounce
 class BinHighlighter(BinManager):
     """
     Example:
@@ -272,7 +272,8 @@ class BinHighlighter(BinManager):
     def set_visible_bin_width(self, width: float):
         self.selection_bin_width = width
         self.redraw()
-        
+    
+    @debounce(.1)
     def redraw(self):
         """Redwaw the bin highlight"""
         if self.enabled:
