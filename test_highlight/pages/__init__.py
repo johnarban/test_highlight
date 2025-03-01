@@ -38,7 +38,7 @@ def Page():
     
     use_selection_layer = solara.use_reactive(True)
     
-    use_js = solara.use_reactive(False)
+    use_js = solara.use_reactive(True)
     
     def _glue_setup():
         glue_app = JupyterApplication()

@@ -398,7 +398,7 @@ def DotplotViewer(
                 def extend_the_tools():  
                     extend_tool(dotplot_view, 'plotly:home', activate_cb=turn_off_bins, activate_before_tool=True)
                     extend_tool(dotplot_view, 'plotly:home', activate_cb=_on_reset_bounds, activate_before_tool=False)
-                    extend_tool(dotplot_view, 'plotly:home', activate_cb=turn_off_bins, activate_before_tool=False)
+                    extend_tool(dotplot_view, 'plotly:home', activate_cb=turn_on_bins, activate_before_tool=False)
                     
                     extend_tool(dotplot_view, 'hubble:wavezoom', activate_cb=turn_off_bins, activate_before_tool=True)
                     extend_tool(dotplot_view, 'hubble:wavezoom', deactivate_cb=_on_bounds_changed, activate_before_tool=False)
