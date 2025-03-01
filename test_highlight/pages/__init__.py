@@ -36,7 +36,7 @@ def Page():
     nbins = solara.use_reactive(25)
     bin_width = solara.use_reactive(1.0)
     
-    use_selection_layer = solara.use_reactive(False)
+    use_selection_layer = solara.use_reactive(True)
     
     use_js = solara.use_reactive(False)
     

@@ -190,12 +190,7 @@ class BinHighlighter(BinManager):
         if self.use_selection_layer:
             if self._setup_selection_layer:
                 self.setup_selection_layer()
-            if self.highlight_on_click:
-                self.viewer.selection_layer.on_click(self._on_hover)
-            else:
-                self.viewer.selection_layer.on_hover(self._on_hover)
-                self.viewer.selection_layer.on_unhover(self._on_unhover)
-        
+            self.add_callbacks_to_selection_layer()
         
         if self.visible_bins or not self.use_selection_layer:
             bin_layer = self.bin_layer
@@ -206,6 +201,13 @@ class BinHighlighter(BinManager):
         self.enabled = True
 
     
+    def add_callbacks_to_selection_layer(self):
+        if hasattr(self.viewer, "selection_layer"):
+            if self.highlight_on_click:
+                self.viewer.selection_layer.on_click(self._on_hover)
+            else:
+                self.viewer.selection_layer.on_hover(self._on_hover)
+                self.viewer.selection_layer.on_unhover(self._on_unhover)
 
     
 

@@ -86,7 +86,6 @@ def TestViewer(gjapp,
         nbins.subscribe(lambda x: setattr(viewer.state, 'hist_n_bin', x))
         
         def on_click(trace, points, state):
-            print('test_viewer clicked!', points)
             if on_click_callback is not None:
                 on_click_callback(points)
             if len(points.xs) == 0:
@@ -150,6 +149,7 @@ def TestViewer(gjapp,
                                     on_click=on_click,
             )
             bin_shower.setup_bin_layer()
+            # bin_shower.add_callbacks_to_selection_layer()
             def on_nbins_change(value):
                 if bin_shower is not None:
                     bin_shower.redraw_bins()

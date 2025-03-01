@@ -16,9 +16,9 @@ class BinManager:
         show_bins_with_data_only: bool = False,
         visible_bins: bool = True,
         use_selection_layer: bool = True,
-        on_click: Callable = lambda *args, **kwargs: None,
-        on_hover: Callable = lambda *args, **kwargs: None,
-        on_unhover: Callable = lambda *args, **kwargs: None
+        on_click: Optional[Callable] = None,
+        on_hover: Optional[Callable] = None,
+        on_unhover: Optional[Callable] = None,
     ):
         self.viewer = viewer
         self.bin_width = bin_width
@@ -117,6 +117,7 @@ class BinManager:
                 bin_layer.on_hover(self.on_hover)
                 bin_layer.on_unhover(self.on_unhover)
     
+    
     def setup_selection_layer(self):
         if not hasattr(self.viewer, 'selection_layer'):
             raise AttributeError(f'Can not setup the selection layer as viewer {self.viewer} has not selection layer')
@@ -140,6 +141,22 @@ class BinManager:
         self.viewer.set_selection_active(True)
         self.viewer.selection_layer.update(visible=True, z=[list(range(201))], opacity=0, coloraxis="coloraxis")
         self.viewer.figure.update_coloraxes(showscale=False)
+        
+    def add_callbacks_to_selection_layer(self):
+        if hasattr(self.viewer, "selection_layer"):
+            if self.on_click:
+                self.viewer.selection_layer.on_click(self.on_click)
+            if self.on_hover:
+                self.viewer.selection_layer.on_hover(self.on_hover)
+            if self.on_unhover:
+                self.viewer.selection_layer.on_unhover(self.on_unhover)
+                
+    def remove_callbacks_from_selection_layer(self):
+        if hasattr(self.viewer, "selection_layer"):
+            self.viewer.selection_layer._click_callbacks = [cb for cb in self.viewer.selection_layer._click_callbacks if cb != self.on_click]
+            self.viewer.selection_layer._hover_callbacks = [cb for cb in self.viewer.selection_layer._hover_callbacks if cb != self.on_hover]
+            self.viewer.selection_layer._unhover_callbacks = [cb for cb in self.viewer.selection_layer._unhover_callbacks if cb != self.on_unhover]
+
     
     @property
     def bin_layer(self) -> Optional[go.Bar]:

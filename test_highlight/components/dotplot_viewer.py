@@ -120,7 +120,7 @@ def DotplotViewer(
             rv.Spacer() # type: ignore # type: ignore
             toolbar_container = rv.Html(tag="div") # type: ignore # type: ignore
 
-        viewer_container = rv.Html(tag="div", style_=f"width: 100%; height: {height}px", class_="mb-4") # type: ignore
+        viewer_container = rv.Html(tag="div", style_=f"width: 100%; height: 100%", class_="mb-4") # type: ignore
         
         
         
@@ -146,7 +146,6 @@ def DotplotViewer(
                 viewer.add_data(data[0], layer_type=data[1])
 
         def _add_viewer():
-            logger.info(f"Dotplot _add_viewer()")
             if data is None:
                 viewer_data = Data(label = "Test Data", x=[randint(1, 10) for _ in range(30)])
                 gjapp.data_collection.append(viewer_data)
@@ -198,19 +197,14 @@ def DotplotViewer(
                 return layer_artist
             
             def hide_ignored_layers(*args):
-                logger.info("Hiding ignored layers")
                 layers = dotplot_view.layers
                 hidden_layers = [get_layer(l) for l in hide_layers.value] # type: ignore
-                # visible_layers = [l for l in layers if l not in hidden_layers]
                 for layer in hidden_layers:
                     if layer is not None:
-                        # logger.info(f"\n\t({title}) Hiding layer: {layer.layer.label}")
                         layer.visible = False
                 for layer in layers:
                     if (layer is not None) and not layer in hidden_layers:
-                        # logger.info(f"\n\t({title}) Showing layer: {layer.layer.label}")
                         layer.visible = True
-                layer_status = ''.join([f"\n\t{l.layer.label}: {'visible' if l.visible else 'not visible'}" for l in dotplot_view.layers])
             
             hide_ignored_layers()
             hide_layers.subscribe(hide_ignored_layers)
@@ -301,7 +295,7 @@ def DotplotViewer(
                     if on_click_callback is not None:
                         on_click_callback(points)
                 else:
-                   logger.info(f"({title}) No points selected")
+                    print('No points selected')
 
                 
                 
@@ -332,25 +326,17 @@ def DotplotViewer(
                     not np.isclose(x_bounds.value, new_range).all()
                     ):
                     if valid_two_element_array(new_range):
-                        logger.info(f'({title}) reset x_bounds ({new_range[0]:0.2f}, {new_range[1]:0.2f})')
                         x_bounds.set(new_range)
-                    else:
-                        logger.info(f'Skipped setting x_bounds: {new_range}')
-                else:
-                    logger.info(f'({title}) Bounds already set')
                 
             
             def _on_bounds_changed(*args):
-                logger.info("Bounds changed")
+
                 new_range = [dotplot_view.state.x_min, dotplot_view.state.x_max] # type: ignore
                 if (
                     not valid_two_element_array(x_bounds.value) or
                     not np.isclose(x_bounds.value, new_range).all()
                     ):
-                    logger.info(f'({title}) set x_bounds ({new_range[0]:0.2f}, {new_range[1]:0.2f})')
                     x_bounds.set(new_range)
-                else:
-                    logger.info(f'({title}) Bounds already set')
                 
 
             def bin_on_hover(trace, points, state):
