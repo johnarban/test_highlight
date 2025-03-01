@@ -12,11 +12,13 @@ export default {
       isMouseInside: false,
       // create a map to store the eventhandler for removal
       eventHandlers: new Map(),
+      eventHandler: null,
       originalStyle: new Map(),
       index: 0,
       observer: null,
       container: '',
       msg: '',
+      trackingElement: document.querySelector('body'),
     }
   },
 
@@ -37,7 +39,7 @@ export default {
   },
 
   methods: {
-    
+    // document.querySelector("g.cartesianlayer > g > g.plot > g.barlayer.mlayer")
     queryElements() {
       return document.querySelectorAll(`${this.container} > g.barlayer2.mlayer > g > g > g > path`)
     },
@@ -52,7 +54,7 @@ export default {
       let el = [];
       
       const process = (element, index) => {
-        element.style.pointerEvents = 'auto';
+        element.style.pointerEvents = 'none';
         element.setAttribute('data-index', index);
         this.originalStyle.set(element, { style: element.style.cssText });
       };
@@ -60,6 +62,7 @@ export default {
       const interval = setInterval(() => {
         el = this.queryElements();
         if (el.length > 0) {
+        console.log(`found ${el.length} elements`)
         this.el = el;
         clearInterval(interval);
         this.el.forEach(process);
@@ -70,6 +73,7 @@ export default {
       // Set a timeout to reject the promise if elements are not found within a certain time limit
       setTimeout(() => {
         clearInterval(interval);
+        console.error('Elements not found within the time limit')
         reject(new Error('Elements not found within the time limit'));
       }, 10000); // 10 seconds time limit
       });
@@ -128,67 +132,65 @@ export default {
       this.observer.observe(watchNode, config);
     },
     
-    applyListeners() {
-      this.el.forEach(element => {
-        let isMouseInside = false;
 
-        const enterHandler = () => {
-          if (!isMouseInside) {
-            isMouseInside = true;
-            element.style.fill = 'rgb(0, 0, 0)';
-            element.style.fillOpacity = '0.5';
-            element.style.stroke = 'rgb(120, 120, 255)';
-            element.style.strokeOpacity = '1';
-          }
-        }
-        
-
-        // Add mouseleave event listener
-        const leaveHandler = () => {
-          if (isMouseInside) {
-            isMouseInside = false;
-            if (this.originalStyle.get(element) === undefined) {
-              element.style.fill = 'rgb(0,0,0)';
-              element.style.fillOpacity = '0';
-              element.style.stroke = 'rgb(0, 0, 0)';
-              element.style.strokeOpacity = '0';
-            }
-            element.style.cssText = this.originalStyle.get(element).style;
-          }
-        }
-        
-        
-        const handler = { enterHandler, leaveHandler };
-        this.eventHandlers.set(element, handler);
-        
-        element.addEventListener('mouseenter', enterHandler);
-        element.addEventListener('mouseleave', leaveHandler );
-        
-        this.setupMutationObserver()
-        
-
-      });
-      
-      
-          
-      
+    highlightElement(element) {
+      element.style.fill = 'rgb(0, 0, 0)';
+      element.style.fillOpacity = '0.5';
+      element.style.stroke = 'rgb(120, 120, 255)';
+      element.style.strokeOpacity = '1';
+    },
+    
+    unhighlightElement(element) {
+      if (this.originalStyle.get(element)) {
+        element.style.cssText = this.originalStyle.get(element).style;
+      } else {
+        element.style.fill = 'rgb(0,0,0)';
+        element.style.fillOpacity = '0';
+        element.style.stroke = 'rgb(0, 0, 0)';
+        element.style.strokeOpacity = '0';
+      }
     },
     
     
-    removeListeners() {
-      this.el.forEach(element => {
-        if (this.eventHandlers.size === 0) return;
+    applyListeners() {      
+      let currentlyHighlighted = null;
+      this.trackingElement = document.querySelector(`.${this.viewer_id}`)
+      
+      const trackMouse = (e) => {
+        console.log('tracking mouse')
         this.el.forEach(element => {
-          const handlers = this.eventHandlers.get(element);
-          if (handlers) {
-            if (handlers.enterHandler) element.removeEventListener('mouseenter', handlers.enterHandler);
-            if (handlers.leaveHandler) element.removeEventListener('mouseleave', handlers.leaveHandler);
+          const rect = element.getBoundingClientRect();
+          const isInside = (
+            e.clientX > rect.left &&
+            e.clientX < rect.right &&
+            e.clientY >= rect.top &&
+            e.clientY <= rect.bottom
+          );
+          
+          if (!isInside && element !== currentlyHighlighted && currentlyHighlighted !== null) {
+            console.log('unhighlighting')
+            this.unhighlightElement(element);
+          } else if (isInside && element !== currentlyHighlighted) {
+            console.log('highlighting')
+            this.highlightElement(element);
+            currentlyHighlighted = element;
           }
-        });
+        })
+      }
+      // Store handler for cleanup
+      this.eventHandler = trackMouse;
+      this.trackingElement.addEventListener('mousemove', trackMouse);
 
-        this.eventHandlers.clear();
-      });
+      this.setupMutationObserver();
     },
+
+    removeListeners() {
+      if (this.eventHandler) {
+        this.trackingElement.removeEventListener('mousemove', this.eventHandler);
+        this.eventHandler = null;
+      }
+    },
+
 
     redo() {
       this.removeListeners()
