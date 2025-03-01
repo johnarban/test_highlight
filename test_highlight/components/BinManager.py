@@ -16,6 +16,9 @@ class BinManager:
         show_bins_with_data_only: bool = False,
         visible_bins: bool = True,
         use_selection_layer: bool = True,
+        on_click: Callable = lambda *args, **kwargs: None,
+        on_hover: Callable = lambda *args, **kwargs: None,
+        on_unhover: Callable = lambda *args, **kwargs: None
     ):
         self.viewer = viewer
         self.bin_width = bin_width
@@ -26,6 +29,10 @@ class BinManager:
         self.bins = None
         self.dx = None
         self.ymax = None
+        
+        self.on_click = on_click
+        self.on_hover = on_hover
+        self.on_unhover = on_unhover
         
         # I don't know if all viewers with histograms have 
         # a selection layer. I think, but just in case
@@ -41,6 +48,7 @@ class BinManager:
             return
         self.bins = (bin_edges[0:-1] + bin_edges[1:]) / 2
         self.dx = bin_edges[1] - bin_edges[0]
+        print("finding dx", self.dx)
         self.ymax = self.viewer.state.y_max
     
     def _filter_bins(self):
@@ -57,7 +65,7 @@ class BinManager:
     def _create_bin_layer(self, marker_style) -> go.Bar | None:
         if self.dx is None or self.bins is None:
             raise ValueError("Bin layer creation failed: Bins or dx is None")
-        return go.Bar(
+        bar = go.Bar(
                 name="all_bins",
                 meta="all_bins_meta",
                 x=self.bins,
@@ -69,6 +77,7 @@ class BinManager:
                 visible=True,
                 showlegend=False,
             )
+        return bar
     
     def nearest_bin(self, x: float) -> float | None:
         if self.bins is None:
@@ -98,6 +107,40 @@ class BinManager:
 
         self.traces_added = True
         
+
+        self.setup_selection_layer()
+        if not self.use_selection_layer:
+            bin_layer = self.bin_layer
+            if bin_layer:
+                print('adding callbacks')
+                bin_layer.on_click(self.on_click)
+                bin_layer.on_hover(self.on_hover)
+                bin_layer.on_unhover(self.on_unhover)
+    
+    def setup_selection_layer(self):
+        if not hasattr(self.viewer, 'selection_layer'):
+            raise AttributeError(f'Can not setup the selection layer as viewer {self.viewer} has not selection layer')
+        resolution = 200
+        def new_update_selection(viewer=self.viewer):
+            state = viewer.state
+            x0 = state.x_min
+            dx = (state.x_max - state.x_min) * (1/resolution)
+            y0 = state.y_min
+            dy = (state.y_max - state.y_min) * 2
+            viewer.selection_layer.update(x0=x0 - dx, dx=dx, y0=y0, dy=dy)
+        self.viewer.set_selection_active(True)
+        self.viewer.figure.update_layout(clickmode="event", hovermode="closest", showlegend=False)
+        self.viewer.selection_layer.update(visible=True, z=[list(range(resolution + 1))], opacity=0, coloraxis="coloraxis")
+        self.viewer.figure.update_coloraxes(showscale=False)
+        new_update_selection()
+        self.viewer._update_selection_layer_bounds = new_update_selection
+        self.reset_selection_layer()
+    
+    def reset_selection_layer(self):
+        self.viewer.set_selection_active(True)
+        self.viewer.selection_layer.update(visible=True, z=[list(range(201))], opacity=0, coloraxis="coloraxis")
+        self.viewer.figure.update_coloraxes(showscale=False)
+    
     @property
     def bin_layer(self) -> Optional[go.Bar]:
         return next(self.viewer.figure.select_traces({"meta": "all_bins_meta"}), None)
@@ -110,9 +153,7 @@ class BinManager:
     
     @debounce(.1)
     def redraw_bins(self):
-        if self.bin_layer is not None:
-            self.turn_off_bins()
-        sleep(0.1)
+        self.turn_off_bins()
         self.setup_bin_layer()
     
     def set_visible_bin_width(self, width: float):

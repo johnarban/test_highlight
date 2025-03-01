@@ -36,9 +36,9 @@ def Page():
     nbins = solara.use_reactive(25)
     bin_width = solara.use_reactive(1.0)
     
-    use_selection_layer = solara.use_reactive(True)
+    use_selection_layer = solara.use_reactive(False)
     
-    use_js = solara.use_reactive(True)
+    use_js = solara.use_reactive(False)
     
     def _glue_setup():
         glue_app = JupyterApplication()
@@ -84,13 +84,13 @@ def Page():
         else:
             points = args[0]
         if hasattr(points, 'xs') and len(points.xs) > 0:
-            print(points.xs)
+            # print(points.xs)
             line_marker_at.value = points.xs[0]
         num_clicks.value += 1
         # line_marker_at.value = args[1].xs[0]
         
     def hover_callback(*args, **kwargs):
-        print('hovered!')
+        # print('hovered!')
         hover_count.value += 1
         # for .5seconds set is_hovering to True
         is_hovering.value = True
@@ -130,8 +130,8 @@ def Page():
                 ) # type: ignore
             solara.Text(f'Number of Clicks: {num_clicks.value}')
             solara.Text(f'Number of Hovers: {hover_count.value}')
-            solara.Text(f'Click is at: {line_marker_at.value}')
-            solara.Text(f'Hover is at: {hover_location.value}')
+            solara.Text(f'Click is at: {line_marker_at.value:0.3f}')
+            solara.Text(f'Hover is at: {hover_location.value:0.3f}')
             solara.Switch(
                 label = "Show dotplot",
                 value = show_dotplot
@@ -147,33 +147,35 @@ def Page():
             
 
     with solara.Card(margin=10):
-        if show_dotplot.value:
-            DotplotViewer(
-                app, 
-                # data=app.data_collection[EXAMPLE_GALAXY_SEED_DATA], 
-                # component_id=DB_VELOCITY_FIELD,
-                data = app.data_collection[0],
-                component_id='x',
-                title = 'Dotplot Viewer',
-                on_click_callback = hover_callback,
-                vertical_line_visible=vertical_line_visible,
-                unit = '#',
-                x_label = 'Value',
-                y_label = 'Count',
-                highlight_bins=highlight_bins,
-                nbin=nbins.value,
-                use_js = False
-                )       
-        else:
-            TestViewer(app, 
-                       data=app.data_collection[0],
-                        use_selection_layer=use_selection_layer,
-                       on_click_callback=click_callback,
-                       on_hover_callback=hover_callback,
-                       highlight_bins=highlight_bins,
-                       only_show_bins=only_show_bins,
-                       nbins=nbins,
-                        bin_width=bin_width,
-                        use_python_highlighing=not use_js.value,
-                       )
+
+        DotplotViewer(
+            app, 
+            # data=app.data_collection[EXAMPLE_GALAXY_SEED_DATA], 
+            # component_id=DB_VELOCITY_FIELD,
+            data = app.data_collection[0],
+            component_id='x',
+            title = 'Dotplot Viewer',
+            on_click_callback = click_callback,
+            on_hover_callback=hover_callback,
+            vertical_line_visible=vertical_line_visible,
+            use_selection_layer=use_selection_layer.value,
+            unit = '#',
+            x_label = 'Value',
+            y_label = 'Count',
+            highlight_bins=not vertical_line_visible.value,
+            nbin=nbins.value,
+            use_js = use_js.value,
+            )       
+
+        TestViewer(app, 
+                    data=app.data_collection[0],
+                    use_selection_layer=use_selection_layer.value,
+                    on_click_callback=click_callback,
+                    on_hover_callback=hover_callback,
+                    highlight_bins=highlight_bins,
+                    only_show_bins=only_show_bins,
+                    nbins=nbins,
+                    bin_width=bin_width,
+                    use_python_highlighing=not use_js.value,
+                    )
         

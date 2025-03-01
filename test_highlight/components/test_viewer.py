@@ -8,13 +8,15 @@ from typing import Callable, Optional, List, cast
 from .bin_highligher import BinHighlighter
 from .BinManager import BinManager
 from .PlotlyHighlighting import _PlotlyHighlighting
+from hubbleds.utils import PLOTLY_MARGINS
+
 
 @solara.component
 def TestViewer(gjapp, 
                data: Optional[Data] = None, 
                highlight_bins: solara.Reactive[bool] | bool = False,    
                only_show_bins: solara.Reactive[bool] | bool = False, 
-               use_selection_layer: solara.Reactive[bool] | bool = False,
+               use_selection_layer: bool = False,
                on_click_callback = None, 
                on_hover_callback = None,
                nbins: solara.Reactive[int] | int = 5,
@@ -53,13 +55,12 @@ def TestViewer(gjapp,
         ```
     """
     viewer_container = rv.Html(tag='div', style_=f"width: 100%; height: 100%") # type: ignore
-    use_selection_layer = solara.use_reactive(use_selection_layer)
+
     highlight_bins = solara.use_reactive(highlight_bins)
-    bin_highlighter: solara.Reactive[BinHighlighter | None] = solara.use_reactive(None)
     nbins = solara.use_reactive(nbins)
     bin_width = solara.use_reactive(bin_width)
     only_show_bins = solara.use_reactive(only_show_bins)
-    viewer_class = solara.use_reactive('')
+
 
     
     def _viewer_setup(data):
@@ -75,57 +76,63 @@ def TestViewer(gjapp,
         
         viewer = gjapp.new_data_viewer(HubbleDotPlotView, data=data, show=True)
         vc = solara.get_widget(viewer_container)
-        vc.children = (viewer.figure_widget,) # type: ignore
-        viewer_class.set(viewer._unique_class)
+
         
         viewer.state.hist_n_bin = nbins.value
         nbins.subscribe(lambda x: setattr(viewer.state, 'hist_n_bin', x))
         
         def on_click(trace, points, state):
+            print('test_viewer clicked!', points)
             if on_click_callback is not None:
                 on_click_callback(points)
+            if len(points.xs) == 0:
+                print('No points selected')
         
         
         viewer.selection_layer.on_click(on_click)
+        
     
         # Create BinHighlighter instance
         if use_python_highlighing:
-            bin_highlighter.set(BinHighlighter(viewer, 
-                                            on_hover_callback=on_hover_callback,
-                                            bin_width=bin_width.value, 
-                                            use_selection_layer=use_selection_layer.value,
-                                            selection_bin_width=bin_width.value,
-                                            show_bins_with_data_only=False,
+            vc.children = (viewer.figure_widget,) # type: ignore
+            
+            def on_hover(trace, points, state):
+                if on_hover_callback is not None:
+                    on_hover_callback(points)
+            
+            bin_highlighter = BinHighlighter(viewer, 
+                                            line_color='rgba(255, 120, 255, 1)',
+                                            fill_color='rgba(0,0,0,.5)',
                                             visible_bins=True,
+                                            show_bins_with_data_only=True,
+                                            on_hover_callback=on_hover,
+                                            use_selection_layer=use_selection_layer,
                                             setup_selection_layer=True,
-                                            only_show=only_show_bins.value,
-                                            ))
+                                            only_show=False,
+                                            )
+            if highlight_bins.value:
+                bin_highlighter.setup_bin_highlight()
 
             def toggle_bin_highlight(turn_on: bool):
-                if bin_highlighter.value is None:
+                if bin_highlighter is None:
                     return
                 if turn_on:
-                    bin_highlighter.value.turn_on_bin_highlight()
+                    bin_highlighter.turn_on_bin_highlight()
                 else:
-                    bin_highlighter.value.turn_off_bin_highlight()
+                    bin_highlighter.turn_off_bin_highlight()
             
             toggle_bin_highlight(highlight_bins.value)
             highlight_bins.subscribe(toggle_bin_highlight)      
             
-            def on_use_selection_layer(value):
-                if bin_highlighter.value is not None:
-                    bin_highlighter.value.use_selection_layer = value
-                    bin_highlighter.value.redraw()
-            use_selection_layer.subscribe(on_use_selection_layer)
             
             def on_nbins_change(value):
-                if bin_highlighter.value is not None:
-                    bin_highlighter.value.redraw()
+                if bin_highlighter is not None:
+                    bin_highlighter.redraw()
             nbins.subscribe(on_nbins_change)
             
             def on_bin_width_change(value):
-                if bin_highlighter.value is not None:
-                    bin_highlighter.value.set_visible_bin_width(value)
+                if bin_highlighter is not None:
+                    bin_highlighter.set_visible_bin_width(value)
             bin_width.subscribe(on_bin_width_change)
             
         else:
@@ -134,8 +141,9 @@ def TestViewer(gjapp,
                                     bin_width=bin_width.value,
                                     selection_bin_width=bin_width.value,
                                     visible_bins=True,
-                                    show_bins_with_data_only=False,
-                                    use_selection_layer=False
+                                    show_bins_with_data_only=True,
+                                    use_selection_layer=use_selection_layer,
+                                    on_click=on_click,
             )
             bin_shower.setup_bin_layer()
             def on_nbins_change(value):
@@ -147,7 +155,10 @@ def TestViewer(gjapp,
                 if bin_shower is not None:
                     bin_shower.set_visible_bin_width(value)
             bin_width.subscribe(on_bin_width_change)
+            
+            vc.children = (_PlotlyHighlighting(viewer_id=viewer._unique_class), viewer.figure_widget,) # type: ignore
         
+
         def cleanup():
                 vc.children = () # type: ignore
                 viewer.figure_widget.close()
@@ -158,16 +169,7 @@ def TestViewer(gjapp,
     
 
     
-    solara.use_effect(lambda :_viewer_setup(data), dependencies=[only_show_bins.value, use_python_highlighing])
-    
-    def add_highlighting():
-        print('adding highlighting', viewer_class.value)
-        pl = _PlotlyHighlighting(viewer_id=viewer_class.value)
-        vc = solara.get_widget(viewer_container)
-        vc.children = (pl, ) + tuple(vc.children) # type: ignore
-    
-    # solara.use_effect(add_highlighting, dependencies=[viewer_class.value])
-    viewer_class.subscribe(lambda x: add_highlighting())
+    solara.use_effect(lambda :_viewer_setup(data), dependencies=[only_show_bins.value, use_python_highlighing, use_selection_layer])
     
     return viewer_container
 

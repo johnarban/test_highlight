@@ -30,6 +30,7 @@ logger = setup_logger("DOTPLOT")
 from glue_jupyter import JupyterApplication
 
 from .bin_highligher import BinHighlighter
+from .PlotlyHighlighting import _PlotlyHighlighting
 
 def valid_two_element_array(arr: Union[None, list]):
     return not (arr is None or len(arr) != 2 or np.isnan(arr).any())
@@ -57,6 +58,8 @@ def DotplotViewer(
     title = None, 
     height=300, 
     on_click_callback = None, 
+    on_hover_callback = None,
+    use_selection_layer = True,
     line_marker_at: Optional[Reactive | int | float] = None, 
     line_marker_color = LIGHT_GENERIC_COLOR, 
     vertical_line_visible: Union[Reactive[bool], bool] = True,
@@ -107,6 +110,7 @@ def DotplotViewer(
     hide_layers = solara.use_reactive(hide_layers)
     # bin_highlighter: Reactive[Optional[BinHighlighter]] = solara.use_reactive(None)
     highlight_bins = solara.use_reactive(highlight_bins)
+    viewer_class = solara.use_reactive('')
     
     with rv.Card() as main: # type: ignore
         with rv.Toolbar(dense=True, class_="toolbar"): # type: ignore
@@ -118,14 +122,7 @@ def DotplotViewer(
 
         viewer_container = rv.Html(tag="div", style_=f"width: 100%; height: {height}px", class_="mb-4") # type: ignore
         
-        def _line_ids_for_viewer(viewer: PlotlyBaseView):
-            line_ids = []
-            traces = list(chain(l.traces() for l in viewer.layers))
-            for trace in viewer.figure.data:
-                if trace not in traces and isinstance(trace, Scatter) and getattr(trace, "meta", None):
-                    line_ids.append(trace.meta)
-
-            return line_ids
+        
         
         def _remove_lines(viewers: List[PlotlyBaseView], line_ids: List[List[str]]):
             if not line_ids:
@@ -263,7 +260,14 @@ def DotplotViewer(
 
             viewer_widget = solara.get_widget(viewer_container)
             viewer_widget.children = (dotplot_view.figure_widget,) # type: ignore
+            viewer_class.set(dotplot_view._unique_class)
+            
+            
 
+            if use_js:
+                pl = _PlotlyHighlighting(viewer_id=dotplot_view._unique_class, show=False)
+                viewer_widget.children = (pl, ) + tuple(viewer_widget.children) # type: ignore
+            
             # The auto sizing in the plotly widget only works if the height
             #  and width are undefined. First, unset the height and width,
             #  then enable auto sizing.
@@ -312,18 +316,7 @@ def DotplotViewer(
                 dotplot_view.figure.update_coloraxes(showscale=False)
             
 
-            def apply_zorder():
-                logger.info(f"({title}) Applying zorder")
-                if zorder:
-                    logger.info(f"({title}) zorder: {zorder}")
-                    logger.info(f"({title}) layers: {dotplot_view.layers}")
-                    for i, layer in enumerate(dotplot_view.layers):
-                        try:
-                            layer.state.zorder = zorder[i]
-                        except IndexError:
-                            layer.state.zorder = max(zorder) + 1
             
-            # prevent_callback = False
             
             def _on_reset_bounds(*args):
                 if None not in reset_bounds.value and len(reset_bounds.value) == 2:
@@ -345,8 +338,7 @@ def DotplotViewer(
                         logger.info(f'Skipped setting x_bounds: {new_range}')
                 else:
                     logger.info(f'({title}) Bounds already set')
-                # if bin_highlighter is not None:
-                #     bin_highlighter.redraw()
+                
             
             def _on_bounds_changed(*args):
                 logger.info("Bounds changed")
@@ -359,52 +351,74 @@ def DotplotViewer(
                     x_bounds.set(new_range)
                 else:
                     logger.info(f'({title}) Bounds already set')
+                
 
             def bin_on_hover(trace, points, state):
-                if on_click_callback is not None:
-                    on_click_callback(points)
+                if on_hover_callback is not None:
+                    on_hover_callback(points)
             bin_highlighter = None
 
+            if not use_js:
+                bin_highlighter = BinHighlighter(dotplot_view,
+                                                line_color='rgba(255, 120, 255, 1)',
+                                                fill_color='rgba(0,0,0,.5)',
+                                                visible_bins=True,
+                                                show_bins_with_data_only=True,
+                                                on_hover_callback=bin_on_hover,
+                                                use_selection_layer=use_selection_layer,
+                                                setup_selection_layer=False,
+                                                highlight_on_click=False,
+                                                only_show=use_js,
+                                                )
+                if highlight_bins.value:
+                    bin_highlighter.setup_bin_highlight()
 
-            bin_highlighter = BinHighlighter(dotplot_view,
-                                            line_color='rgba(120, 120, 255, 1)',
-                                            fill_color='rgba(0,0,0,.5)',
-                                            visible_bins=True,
-                                            show_bins_with_data_only=True,
-                                            on_hover_callback=bin_on_hover,
-                                            use_selection_layer=True,
-                                            setup_selection_layer=False,
-                                            highlight_on_click=False,
-                                            only_show=use_js,
-                                            )
+                def turn_off_bin_highlighter():
+                    if bin_highlighter is not None:
+                        bin_highlighter.turn_off_bin_highlight()
+                def turn_on_bin_highlighter():
+                    if bin_highlighter is not None:
+                        bin_highlighter.redraw()
+                
+                
 
-            def turn_off_bin_highlighter():
-                if bin_highlighter is not None:
-                    bin_highlighter.turn_off_bin_highlight()
-            def turn_on_bin_highlighter():
-                if bin_highlighter is not None:
-                    bin_highlighter.turn_on_bin_highlight()
-            
-            def toggle_bin_highlighter(show = True):
-                if show:
-                    turn_on_bin_highlighter()
-                else:
-                    turn_off_bin_highlighter()
-
+                        
+                def extend_the_tools():  
+                    # extend_tool(dotplot_view, 'plotly:home', activate_cb=turn_off_bin_highlighter, activate_before_tool=True)
+                    extend_tool(dotplot_view, 'plotly:home', activate_cb=_on_reset_bounds, activate_before_tool=False)
+                    extend_tool(dotplot_view, 'plotly:home', activate_cb=turn_on_bin_highlighter, activate_before_tool=False)
+                    # extend_tool(dotplot_view, 'plotly:home', deactivate_cb=turn_on_bin_highlighter, deactivate_before_tool=False)
                     
-            def extend_the_tools():  
-                extend_tool(dotplot_view, 'plotly:home', activate_cb=turn_off_bin_highlighter, activate_before_tool=True)
-                extend_tool(dotplot_view, 'plotly:home', activate_cb=_on_reset_bounds, activate_before_tool=False)
-                extend_tool(dotplot_view, 'plotly:home', activate_cb=apply_zorder)
-                extend_tool(dotplot_view, 'plotly:home', activate_cb=turn_on_bin_highlighter, activate_before_tool=False)
-                extend_tool(dotplot_view, 'plotly:home', activate_cb=turn_on_bin_highlighter, activate_before_tool=False)
+                    extend_tool(dotplot_view, 'hubble:wavezoom', activate_cb=turn_off_bin_highlighter, activate_before_tool=True)
+                    extend_tool(dotplot_view, 'hubble:wavezoom', deactivate_cb=_on_bounds_changed, activate_before_tool=False)
+                    extend_tool(dotplot_view, 'hubble:wavezoom', deactivate_cb=turn_on_bin_highlighter, deactivate_before_tool=False)
+                    
+            else:
+                bin_shower = BinManager(dotplot_view,
+                                        bin_width=1,
+                                        selection_bin_width=1,
+                                        visible_bins=True,
+                                        show_bins_with_data_only=True,
+                                        use_selection_layer=use_selection_layer,
+                                        )
+                bin_shower.setup_bin_layer()
                 
-                extend_tool(dotplot_view, 'hubble:wavezoom', activate_cb=turn_off_bin_highlighter, activate_before_tool=True)
-                extend_tool(dotplot_view, 'hubble:wavezoom', deactivate_cb=_on_bounds_changed, activate_before_tool=False)
-                extend_tool(dotplot_view, 'hubble:wavezoom', deactivate_cb=apply_zorder)
-                extend_tool(dotplot_view, 'hubble:wavezoom', deactivate_cb=turn_on_bin_highlighter, deactivate_before_tool=False)
+                def turn_off_bins():
+                    bin_shower.turn_off_bins()
+                def turn_on_bins():
+                    if highlight_bins.value:
+                        bin_shower.redraw_bins()
                 
+                def extend_the_tools():  
+                    extend_tool(dotplot_view, 'plotly:home', activate_cb=turn_off_bins, activate_before_tool=True)
+                    extend_tool(dotplot_view, 'plotly:home', activate_cb=_on_reset_bounds, activate_before_tool=False)
+                    extend_tool(dotplot_view, 'plotly:home', activate_cb=turn_off_bins, activate_before_tool=False)
+                    
+                    extend_tool(dotplot_view, 'hubble:wavezoom', activate_cb=turn_off_bins, activate_before_tool=True)
+                    extend_tool(dotplot_view, 'hubble:wavezoom', deactivate_cb=_on_bounds_changed, activate_before_tool=False)
 
+                    extend_tool(dotplot_view, 'hubble:wavezoom', deactivate_cb=turn_on_bins, deactivate_before_tool=False)
+                
                 
                 # extend_tool(dotplot_view, 'hubble:wavezoom', deactivate_cb=turn_on_bin_highlighter)
             extend_the_tools()
@@ -435,14 +449,25 @@ def DotplotViewer(
                 tool.activate()
             
             reset_selection()
-            if highlight_bins.value and bin_highlighter is not None:
-                bin_highlighter.setup_bin_highlight()
-            apply_zorder()
+
+            
+            def toggle_bin_highlighter(show = True):
+                    if not use_js:
+                        if show:
+                            turn_on_bin_highlighter()
+                        else:
+                            turn_off_bin_highlighter()
+                    else:
+                        if show:
+                            bin_shower.redraw_bins()
+                        else:
+                            bin_shower.turn_off_bins()
+            
             
             toggle_bin_highlighter(highlight_bins.value)
+            
             highlight_bins.subscribe(toggle_bin_highlighter)
             
-            viewer_data_log = ''.join([f"\n\t{l.layer.label}: {'visible' if l.visible else 'not visible'}" for l in dotplot_view.layers])            
             
             def cleanup():
                 for cnt in (title_widget, toolbar_widget, viewer_widget):
@@ -454,6 +479,8 @@ def DotplotViewer(
 
             return cleanup
 
-        solara.use_effect(_add_viewer, dependencies=[])
+        solara.use_effect(_add_viewer, dependencies=[use_selection_layer,use_js])
+        
+        
 
     return main

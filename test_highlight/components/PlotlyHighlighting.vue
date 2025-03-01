@@ -1,7 +1,7 @@
 <script>
 export default {
   
-  props: ['viewer_id'],
+  props: ['viewer_id', 'show'],
 
   data() {
     return {
@@ -17,7 +17,6 @@ export default {
       observer: null,
       container: '',
       msg: '',
-      show: true,
     }
   },
 
