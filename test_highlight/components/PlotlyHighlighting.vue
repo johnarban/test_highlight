@@ -14,6 +14,10 @@ export default {
     highlight: {
       type: Boolean,
       default: true
+    },
+    debug: {
+      type: Boolean,
+      default: false
     }
   },
 
@@ -24,29 +28,38 @@ export default {
       debounceTimeout: null,
       debounceTimeout2: null,
       isMouseInside: false,
-      // create a map to store the eventhandler for removal
       eventHandlers: new Map(),
       eventHandler: null,
       originalStyle: new Map(),
       index: 0,
       observer: null,
       container: '',
-      msg: '',
       trackingElement: document.querySelector('body'),
+      showButtons: false,
     }
   },
 
   async mounted() {
+    if (this.show) {
+      console.log('%c PlotlyHighlighter buttons are visible', 'color: red; font-weight: bold; font-size: 12px')
+    }
     console.log(`mounted PlotlyHighlighter for: ${this.viewer_id}`)
     this.container = `.${this.viewer_id} g.cartesianlayer > g > g.plot`
-    
+    this.showButtons = this.show
     // setup the highlighting immediately
+    let checkDuration = 200 // 60 * 1000 // 60 seconds
     const interval = setInterval(() => {
       const els = this.queryElements()
       if (els.length > 0) {
         console.log(`there are ${els.length} elements`)
         clearInterval(interval)
         this.redo()
+      }
+      checkDuration -= 100
+      if (checkDuration <= 0) {
+        console.error('%c No elements found for PlotlyHighlighter', 'color: red; font-weight: bold; font-size: 18px')
+        this.showButtons = this.debug
+        clearInterval(interval)
       }
     }, 100);
     
@@ -260,6 +273,10 @@ export default {
       } else {
         this.removeListeners()
       }
+    },
+    
+    show(value) {
+      this.showButtons = value
     }
     
   }
@@ -268,22 +285,10 @@ export default {
 </script>
 
 <template>
-  <v-col v-if="show">
+  <!-- For debugging only -->
+  <v-col v-if="showButtons">
     Plotly Highlighting:
     <v-btn variant="outlined" @click="redo">Re-apply Highlighting</v-btn>
     <v-btn variant="outlined" @click="highlight = !highlight">Toggle Highlighting</v-btn>
   </v-col>
 </template>
-
-<style>
-button.ph-redo
-{
-  background-color: white;
-  padding: 0.5em 1em;
-  border-radius: 5px;
-  filter: drop-shadow(0 0px 5px black);
-
-  box-shadow: 0 0 0 black;
-  width: fit-content;
-}
-</style>

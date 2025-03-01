@@ -9,18 +9,20 @@ class _PlotlyHighlighting(VuetifyTemplate):
     viewer_id = Unicode().tag(sync=True)
     show = Bool(False).tag(sync=True)
     highlight = Bool(True).tag(sync=True)
+    debug = Bool(False).tag(sync=True)
     
-    def __init__(self, viewer_id = '', show = False, highlight = True, *args, **kwargs):
+    def __init__(self, viewer_id = '', show = False, highlight = True, debug = False, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.viewer_id = viewer_id
         self.show = show
         self.highlight = highlight
+        self.debug = debug
         pass
 
 
 @solara.component
-def PlotlyHighlighting(viewer_id='', show=False, highlight=True):
-    return _PlotlyHighlighting(viewer_id=viewer_id, show=show, highlight=highlight)
+def PlotlyHighlighting(viewer_id='', show=False, highlight=True, debug = False):
+    return _PlotlyHighlighting(viewer_id=viewer_id, show=show, highlight=highlight, debug=debug)
 
     
     
