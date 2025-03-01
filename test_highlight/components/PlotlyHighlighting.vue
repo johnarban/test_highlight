@@ -18,7 +18,32 @@ export default {
     debug: {
       type: Boolean,
       default: false
-    }
+    },
+    
+    fillColor: {
+      type: String,
+      default: 'rgb(0, 0, 0)'
+    },
+    fillOpacity: {
+      type: Number,
+      default: 0.5
+    },
+    strokeColor: {
+      type: Number,
+      default: 'rgb(120, 120, 255)'
+    },
+    strokeOpacity: {
+      type: Number,
+      default: 1
+    },
+    strokeWidth: {
+      type: Number,
+      default: 1
+    },
+    opacity: {
+      type: Number,
+      default: 1
+    },
   },
 
   data() {
@@ -165,10 +190,12 @@ export default {
     
 
     highlightElement(element) {
-      element.style.fill = 'rgb(0, 0, 0)';
-      element.style.fillOpacity = '0.5';
-      element.style.stroke = 'rgb(120, 120, 255)';
-      element.style.strokeOpacity = '1';
+      element.style.fill = this.fillColor
+      element.style.fillOpacity = `${this.fillOpacity}`;
+      element.style.stroke = this.strokeColor
+      element.style.strokeOpacity = `${this.strokeOpacity}`;
+      element.style.strokeWidth = `${this.strokeWidth}`;
+      element.style.opacity = `${this.opacity}`;
     },
     
     unhighlightElement(element) {
