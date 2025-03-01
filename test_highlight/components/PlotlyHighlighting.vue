@@ -154,28 +154,51 @@ export default {
     
     applyListeners() {      
       let currentlyHighlighted = null;
+      let ticking = false;
       this.trackingElement = document.querySelector(`.${this.viewer_id}`)
       
+      
       const trackMouse = (e) => {
+        if (ticking) {
+          return;
+        }
+        ticking = true;
+        
         console.log('tracking mouse')
-        this.el.forEach(element => {
-          const rect = element.getBoundingClientRect();
-          const isInside = (
-            e.clientX > rect.left &&
-            e.clientX < rect.right &&
-            e.clientY >= rect.top &&
-            e.clientY <= rect.bottom
-          );
-          
-          if (!isInside && element !== currentlyHighlighted && currentlyHighlighted !== null) {
-            console.log('unhighlighting')
-            this.unhighlightElement(element);
-          } else if (isInside && element !== currentlyHighlighted) {
-            console.log('highlighting')
-            this.highlightElement(element);
-            currentlyHighlighted = element;
+        window.requestAnimationFrame(() => {
+          let foundHighlighted = false;
+
+          for (let element of this.el) {
+            const rect = element.getBoundingClientRect();
+            const isInside = (
+              e.clientX > rect.left &&
+              e.clientX < rect.right &&
+              e.clientY >= rect.top &&
+              e.clientY <= rect.bottom
+            );
+            
+            if (isInside) {
+              foundHighlighted = true;
+              if (element !== currentlyHighlighted) {
+                if (currentlyHighlighted !== null) {
+                  this.unhighlightElement(currentlyHighlighted);
+                }
+                this.highlightElement(element);
+                currentlyHighlighted = element;
+              }
+            }
           }
-        })
+          
+          if (!foundHighlighted && currentlyHighlighted !== null) {
+            this.unhighlightElement(currentlyHighlighted);
+            currentlyHighlighted = null;
+          }
+          if (!foundHighlighted) {
+            currentlyHighlighted = null;
+          }
+
+          ticking = false;
+        });
       }
       // Store handler for cleanup
       this.eventHandler = trackMouse;
