@@ -75,6 +75,10 @@ def TestViewer(gjapp,
             gjapp.data_collection.append(data)
         
         viewer = gjapp.new_data_viewer(HubbleDotPlotView, data=data, show=True)
+        viewer.figure_widget.update_layout(height=None, width=None)
+        viewer.figure_widget.update_layout(autosize=True, height=300)
+        
+        
         vc = solara.get_widget(viewer_container)
 
         

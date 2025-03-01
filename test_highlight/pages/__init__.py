@@ -147,27 +147,28 @@ def Page():
             
 
     with solara.Card(margin=10):
-
-        DotplotViewer(
-            app, 
-            # data=app.data_collection[EXAMPLE_GALAXY_SEED_DATA], 
-            # component_id=DB_VELOCITY_FIELD,
-            data = app.data_collection[0],
-            component_id='x',
-            title = 'Dotplot Viewer',
-            on_click_callback = click_callback,
-            on_hover_callback=hover_callback,
-            vertical_line_visible=vertical_line_visible,
-            use_selection_layer=use_selection_layer.value,
-            unit = '#',
-            x_label = 'Value',
-            y_label = 'Count',
-            highlight_bins=not vertical_line_visible.value,
-            nbin=nbins.value,
-            use_js = use_js.value,
-            )       
-
-        TestViewer(app, 
+        with solara.Columns(widths=[.5, .5]):
+            # with solara.Column():
+            DotplotViewer(
+                app, 
+                # data=app.data_collection[EXAMPLE_GALAXY_SEED_DATA], 
+                # component_id=DB_VELOCITY_FIELD,
+                data = app.data_collection[0],
+                component_id='x',
+                title = 'Dotplot Viewer',
+                on_click_callback = click_callback,
+                on_hover_callback=hover_callback,
+                vertical_line_visible=vertical_line_visible,
+                use_selection_layer=use_selection_layer.value,
+                unit = '#',
+                x_label = 'Value',
+                y_label = 'Count',
+                highlight_bins=not vertical_line_visible.value,
+                nbin=nbins.value,
+                use_js = use_js.value,
+                )       
+        # with solara.Column():
+            TestViewer(app, 
                     data=app.data_collection[0],
                     use_selection_layer=use_selection_layer.value,
                     on_click_callback=click_callback,
