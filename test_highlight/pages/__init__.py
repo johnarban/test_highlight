@@ -143,40 +143,41 @@ def Page():
             with solara.Card(style='width: 500px'):
                 solara.SliderInt(label='Number of Bins', value=nbins, min=1, max=100)
                 solara.SliderFloat(label='Bin Width', value=bin_width, min=0.1, max=1)  # type: ignore
-            
-            
+    
+    # simple counter to test reactive. count button a display
+    
+     
 
     with solara.Card(margin=10):
-        with solara.Columns(widths=[.5, .5]):
-            # with solara.Column():
+        with solara.Row():
+            TestViewer(app, 
+                data=app.data_collection[0],
+                use_selection_layer=use_selection_layer.value,
+                on_click_callback=click_callback,
+                on_hover_callback=hover_callback,
+                highlight_bins=highlight_bins,
+                only_show_bins=only_show_bins,
+                nbins=nbins,
+                bin_width=bin_width,
+                use_python_highlighing=not use_js.value,
+                )
+        
+        with solara.Row():
             DotplotViewer(
                 app, 
-                # data=app.data_collection[EXAMPLE_GALAXY_SEED_DATA], 
-                # component_id=DB_VELOCITY_FIELD,
-                data = app.data_collection[0],
-                component_id='x',
+                data=app.data_collection[EXAMPLE_GALAXY_SEED_DATA], 
+                component_id=DB_VELOCITY_FIELD,
+                # data = app.data_collection[0],
+                # component_id='x',
                 title = 'Dotplot Viewer',
                 on_click_callback = click_callback,
-                on_hover_callback=hover_callback,
-                vertical_line_visible=vertical_line_visible,
-                use_selection_layer=use_selection_layer.value,
+                vertical_line_visible=vertical_line_visible.value,
                 unit = '#',
                 x_label = 'Value',
                 y_label = 'Count',
-                highlight_bins=not vertical_line_visible.value,
+                highlight_bins=highlight_bins.value,
                 nbin=nbins.value,
-                use_js = use_js.value,
-                )       
-        # with solara.Column():
-            TestViewer(app, 
-                    data=app.data_collection[0],
-                    use_selection_layer=use_selection_layer.value,
-                    on_click_callback=click_callback,
-                    on_hover_callback=hover_callback,
-                    highlight_bins=highlight_bins,
-                    only_show_bins=only_show_bins,
-                    nbins=nbins,
-                    bin_width=bin_width,
-                    use_python_highlighing=not use_js.value,
-                    )
+                )      
+            
+        
         

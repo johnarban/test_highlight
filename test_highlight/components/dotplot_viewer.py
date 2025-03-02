@@ -22,18 +22,21 @@ from typing import Callable, Iterable, List, cast, Union, Optional
 from solara.toestand import Reactive
 import numpy as np
 
-from cosmicds.components import LayerToggle
 
 from cosmicds.logger import setup_logger
 logger = setup_logger("DOTPLOT")
 
 from glue_jupyter import JupyterApplication
 
-from .bin_highligher import BinHighlighter
+from .BinManager import BinManager
 from .PlotlyHighlighting import _PlotlyHighlighting
 
+
 def valid_two_element_array(arr: Union[None, list]):
-    return not (arr is None or len(arr) != 2 or np.isnan(arr).any())
+    try:
+        return not (arr is None or len(arr) != 2 or np.isnan(arr).any())
+    except:
+        return False
 
 def different_value(arr, value, index):
     if not valid_two_element_array(arr):
@@ -48,8 +51,6 @@ def this_or_default(arr, default, index):
 
 _original_update_data = DotplotScatterLayerArtist._update_data
 
-from .BinManager import BinManager
-
 @solara.component
 def DotplotViewer(
     gjapp: JupyterApplication, 
@@ -58,21 +59,23 @@ def DotplotViewer(
     title = None, 
     height=300, 
     on_click_callback = None, 
-    on_hover_callback = None,
-    use_selection_layer = True,
-    line_marker_at: Optional[Reactive | int | float] = None, 
+    line_marker_at: Optional[float | int] = None,  # type: ignore
+    on_line_marker_at_changed: Callable = lambda x: None,
     line_marker_color = LIGHT_GENERIC_COLOR, 
-    vertical_line_visible: Union[Reactive[bool], bool] = True,
+    vertical_line_visible: bool = True, # type: ignore
+    on_vertical_line_visible_changed: Callable = lambda x: None,
     unit: Optional[str] = None,
     x_label: Optional[str] = None,
     y_label: Optional[str] = None,
-    zorder: Optional[list[int]] = None,
     nbin: int = 75,
-    x_bounds: Optional[Reactive[list[float]]] = None,
-    reset_bounds: Reactive[list] = Reactive([]),
-    hide_layers: Reactive[List[Data | Subset]] | list[Data | Subset] = [],
-    highlight_bins: Reactive[bool] | bool = False,
-    use_js = False
+    x_bounds: list[float] = [],  # type: ignore
+    on_x_bounds_changed: Callable = lambda x: None,
+    reset_bounds: list = [],  # type: ignore
+    on_reset_bounds_changed: Callable = lambda x: None,
+    hide_layers: List[Data | Subset] = [],  # type: ignore
+    on_hide_layers_changed: Callable = lambda x: None,
+    highlight_bins: bool = False,
+    on_figure_id: Optional[Callable] = None,
     ):
     
     """
@@ -102,50 +105,46 @@ def DotplotViewer(
     """
     
     logger.info(f"creating DotplotViewer: {title}")
+    x_bounds: Reactive[list] = solara.use_reactive(x_bounds, on_change=on_x_bounds_changed) # type: ignore
+    vertical_line_visible: Reactive[bool] = solara.use_reactive(vertical_line_visible, on_change=on_vertical_line_visible_changed) # type: ignore
+    line_marker_at: Reactive[Number] = solara.use_reactive(line_marker_at, on_change=on_line_marker_at_changed) # type: ignore
+    reset_bounds: Reactive[list] = solara.use_reactive(reset_bounds, on_change=on_reset_bounds_changed) # type: ignore
+    hide_layers: Reactive[list] = solara.use_reactive(hide_layers, on_change=on_hide_layers_changed) # type: ignore
     
-    line_marker_at = solara.use_reactive(line_marker_at)
-    vertical_line_visible = solara.use_reactive(vertical_line_visible)
-    x_bounds = solara.use_reactive(x_bounds) # type: ignore
-    reset_bounds = solara.use_reactive(reset_bounds)
-    hide_layers = solara.use_reactive(hide_layers)
-    # bin_highlighter: Reactive[Optional[BinHighlighter]] = solara.use_reactive(None)
-    highlight_bins = solara.use_reactive(highlight_bins)
-    viewer_class = solara.use_reactive('')
+    if len(x_bounds.value) == 0 and len(reset_bounds.value) == 2:
+        x_bounds.set(reset_bounds.value)
+        
+        
     
-    with rv.Card() as main: # type: ignore
-        with rv.Toolbar(dense=True, class_="toolbar"): # type: ignore
-            with rv.ToolbarTitle(class_="toolbar toolbar-title"): # type: ignore # type: ignore
-                title_container = rv.Html(tag="div") # type: ignore # type: ignore
+    
+    with rv.Card() as main:
+        with rv.Toolbar(dense=True, class_="toolbar"):
+            with rv.ToolbarTitle(class_="toolbar toolbar-title"):
+                title_container = rv.Html(tag="div")
 
-            rv.Spacer() # type: ignore # type: ignore
-            toolbar_container = rv.Html(tag="div") # type: ignore # type: ignore
+            rv.Spacer()
+            toolbar_container = rv.Html(tag="div")
 
-        viewer_container = rv.Html(tag="div", style_=f"width: 100%; height: 100%", class_="mb-4") # type: ignore
-        
-        
-        
-        def _remove_lines(viewers: List[PlotlyBaseView], line_ids: List[List[str]]):
-            if not line_ids:
-                return
-            for (viewer, viewer_line_ids) in zip(viewers, line_ids):
-                shapes = viewer.figure.layout.shapes
-                shapes = tuple(s for s in shapes if s.name not in viewer_line_ids)
-                viewer.figure.layout.shapes = shapes
+        viewer_container = rv.Html(tag="div", style_=f"width: 100%; height: {height}px", class_="mb-4")
 
         
-        def _add_vertical_line(viewer: PlotlyBaseView, value: Number, color: str, label: str = None, line_ids: list[str] = []): # type: ignore
+        def _add_vertical_line(viewer: PlotlyBaseView, value: Number, color: str, label: str = None, line_ids: list[str] = []):
             line_id = str(uuid4())
+            print(line_id)
             line_ids.append(line_id)
             viewer.figure.add_vline(x=value, line_color=color, line_width=2, name=line_id)
 
         
         def _add_data(viewer: PlotlyBaseView, data: Union[Data, tuple]):
             if isinstance(data, Data):
+                logger.info(f"{title}: Adding data: {data.label}")
                 viewer.add_data(data)
             else:
+                logger.info(f"{title}: Adding data: {data.label}")
                 viewer.add_data(data[0], layer_type=data[1])
 
         def _add_viewer():
+            logger.info(f"{title}: _add_viewer()")
             if data is None:
                 viewer_data = Data(label = "Test Data", x=[randint(1, 10) for _ in range(30)])
                 gjapp.data_collection.append(viewer_data)
@@ -157,6 +156,9 @@ def DotplotViewer(
             
             dotplot_view: HubbleDotPlotViewer = gjapp.new_data_viewer(
                 HubbleDotPlotView, show=False) # type: ignore
+            if on_figure_id is not None:
+                print(f"Setting figure id: {dotplot_view._unique_class}")
+                on_figure_id(dotplot_view._unique_class)
 
             _add_data(dotplot_view, viewer_data)
             if isinstance(viewer_data, tuple):
@@ -179,35 +181,42 @@ def DotplotViewer(
             
             
             
-            for layer in dotplot_view.layers:
-                for trace in layer.traces():
-                    trace.update(hoverinfo="skip", hovertemplate=None)
+            # for layer in dotplot_view.layers:
+            #     for trace in layer.traces():
+            #         trace.update(hoverinfo="skip", hovertemplate=None)
 
-            def no_hover_update(self: DotplotScatterLayerArtist):
-                with dotplot_view.figure.batch_update():
-                    _original_update_data(self)
-                    for trace in self.traces():
-                        trace.update(hoverinfo="skip", hovertemplate=None)
-            DotplotScatterLayerArtist._update_data = no_hover_update
+            # this doesn't even get run;
+            # def no_hover_update(self: DotplotScatterLayerArtist):
+            #     logger.info(f"{title}: no_hover_update")
+            #     hide_ignored_layers()
+            #     with dotplot_view.figure.batch_update():
+            #         _original_update_data(self)
+            #         for trace in self.traces():
+            #             trace.update(hoverinfo="skip", hovertemplate=None)
+            #         self._update_zorder()
+            # DotplotScatterLayerArtist._update_data = no_hover_update
+            
                 
             def get_layer(layer_name):
                 layer_artist = dotplot_view.layer_artist_for_data(layer_name) # type: ignore
                 if layer_artist is None:
-                    logger.warning(f"Layer not found: {layer_name}")
+                    logger.warning(f"{title}: Layer not found: {layer_name}")
                 return layer_artist
             
             def hide_ignored_layers(*args):
+                logger.info(f"{title}: Hiding ignored layers")
                 layers = dotplot_view.layers
                 hidden_layers = [get_layer(l) for l in hide_layers.value] # type: ignore
+                # visible_layers = [l for l in layers if l not in hidden_layers]
                 for layer in hidden_layers:
                     if layer is not None:
+                        logger.info(f"({title}): Hiding: {layer.layer.label}")
                         layer.visible = False
                 for layer in layers:
                     if (layer is not None) and not layer in hidden_layers:
+                        logger.info(f"({title}): Showing: {layer.layer.label}")
                         layer.visible = True
             
-            hide_ignored_layers()
-            hide_layers.subscribe(hide_ignored_layers)
 
             # override the default selection layer
             def new_update_selection(self=dotplot_view):
@@ -229,39 +238,35 @@ def DotplotViewer(
             
             line_ids = [] #[_line_ids_for_viewer(dotplot_view)]
             
-            def _update_lines(value = None):
-                # remove any pre existing lines
-
-                _remove_lines([dotplot_view], line_ids)
+            def _update_lines(value = None):                
+                if value is not None:
+                    if len(line_ids) > 0:
+                        dotplot_view.figure.update_shapes(
+                            patch=dict(visible=vertical_line_visible.value and value is not None, x0=value, x1=value),
+                            selector={'name': line_ids[0]})
+                    elif len(line_ids) == 0:
+                        _add_vertical_line(dotplot_view, value, line_marker_color, label = "Line Marker", line_ids = line_ids)
+                elif len(line_ids) > 0:
+                    dotplot_view.figure.update_shapes(
+                        patch=dict(visible=vertical_line_visible.value),
+                        selector={'name': line_ids[0]})
                 
-                line_ids.clear()
-                
-                if vertical_line_visible.value and value is not None:
-                    _add_vertical_line(dotplot_view, value, line_marker_color, label = "Line Marker", line_ids = line_ids)
-                
-                # line_ids.append(_line_ids_for_viewer(dotplot_view))
             
             
             
             if title is not None:
                 dotplot_view.state.title = title
-    
+
             title_widget = solara.get_widget(title_container)
-            title_widget.children = (dotplot_view.state.title or "DOTPLOT VIEWER",) # type: ignore
+            title_widget.children = (dotplot_view.state.title or "DOTPLOT VIEWER",)
 
             toolbar_widget = solara.get_widget(toolbar_container)
-            toolbar_widget.children = (dotplot_view.toolbar,) # type: ignore # type: ignore
+            toolbar_widget.children = (dotplot_view.toolbar,)
 
             viewer_widget = solara.get_widget(viewer_container)
-            viewer_widget.children = (dotplot_view.figure_widget,) # type: ignore
-            viewer_class.set(dotplot_view._unique_class)
-            
-            
+            pl = _PlotlyHighlighting(viewer_id=dotplot_view._unique_class, show=False, highlight=highlight_bins, debug=False)
+            viewer_widget.children = (pl, dotplot_view.figure_widget,)
 
-            if use_js:
-                pl = _PlotlyHighlighting(viewer_id=dotplot_view._unique_class, show=False)
-                viewer_widget.children = (pl, ) + tuple(viewer_widget.children) # type: ignore
-            
             # The auto sizing in the plotly widget only works if the height
             #  and width are undefined. First, unset the height and width,
             #  then enable auto sizing.
@@ -295,7 +300,7 @@ def DotplotViewer(
                     if on_click_callback is not None:
                         on_click_callback(points)
                 else:
-                    print('No points selected')
+                   logger.info(f"{title}: No points selected")
 
                 
                 
@@ -318,103 +323,60 @@ def DotplotViewer(
                     dotplot_view.state.x_min = new_range[0]
                     dotplot_view.state.x_max = new_range[1]
                 else:
-                    new_range = [dotplot_view.state.x_min, dotplot_view.state.x_max] # type: ignore # type: ignore
+                    new_range = [dotplot_view.state.x_min, dotplot_view.state.x_max]
                 
-                # new_range = [dotplot_view.state.x_min, dotplot_view.state.x_max]
-                if (
-                    not valid_two_element_array(x_bounds.value) or
-                    not np.isclose(x_bounds.value, new_range).all()
-                    ):
-                    if valid_two_element_array(new_range):
-                        x_bounds.set(new_range)
-                
-            
-            def _on_bounds_changed(*args):
-
-                new_range = [dotplot_view.state.x_min, dotplot_view.state.x_max] # type: ignore
-                if (
-                    not valid_two_element_array(x_bounds.value) or
-                    not np.isclose(x_bounds.value, new_range).all()
-                    ):
+                if ( valid_two_element_array(x_bounds.value) and not np.isclose(x_bounds.value, new_range).all() ):
+                    logger.info(f'{title}: reset x_bounds ({new_range[0]:0.2f}, {new_range[1]:0.2f})')
                     x_bounds.set(new_range)
-                
-
-            def bin_on_hover(trace, points, state):
-                if on_hover_callback is not None:
-                    on_hover_callback(points)
-            bin_highlighter = None
-
-            if not use_js:
-                bin_highlighter = BinHighlighter(dotplot_view,
-                                                line_color='rgba(255, 120, 255, 1)',
-                                                fill_color='rgba(0,0,0,.5)',
-                                                visible_bins=True,
-                                                show_bins_with_data_only=True,
-                                                on_hover_callback=bin_on_hover,
-                                                use_selection_layer=use_selection_layer,
-                                                setup_selection_layer=False,
-                                                highlight_on_click=False,
-                                                only_show=use_js,
-                                                )
-                if highlight_bins.value:
-                    bin_highlighter.setup_bin_highlight()
-
-                def turn_off_bin_highlighter():
-                    if bin_highlighter is not None:
-                        bin_highlighter.turn_off_bin_highlight()
-                def turn_on_bin_highlighter():
-                    if bin_highlighter is not None:
-                        bin_highlighter.redraw()
-                
-                
-
-                        
-                def extend_the_tools():  
-                    # extend_tool(dotplot_view, 'plotly:home', activate_cb=turn_off_bin_highlighter, activate_before_tool=True)
-                    extend_tool(dotplot_view, 'plotly:home', activate_cb=_on_reset_bounds, activate_before_tool=False)
-                    extend_tool(dotplot_view, 'plotly:home', activate_cb=turn_on_bin_highlighter, activate_before_tool=False)
-                    # extend_tool(dotplot_view, 'plotly:home', deactivate_cb=turn_on_bin_highlighter, deactivate_before_tool=False)
-                    
-                    extend_tool(dotplot_view, 'hubble:wavezoom', activate_cb=turn_off_bin_highlighter, activate_before_tool=True)
-                    extend_tool(dotplot_view, 'hubble:wavezoom', deactivate_cb=_on_bounds_changed, activate_before_tool=False)
-                    extend_tool(dotplot_view, 'hubble:wavezoom', deactivate_cb=turn_on_bin_highlighter, deactivate_before_tool=False)
-                    
-            else:
-                bin_shower = BinManager(dotplot_view,
+                else:
+                    logger.info(f'{title}: Bounds already set')
+            
+            def _on_wavezoom(*args):
+                logger.info(f"{title}: Zoomed")
+                new_range = [dotplot_view.state.x_min, dotplot_view.state.x_max]
+                if (
+                    not valid_two_element_array(x_bounds.value) or
+                    not np.isclose(x_bounds.value, new_range).all()
+                    ):
+                    logger.info(f'{title}: set x_bounds ({new_range[0]:0.2f}, {new_range[1]:0.2f})')
+                    x_bounds.set(new_range)
+                else:
+                    logger.info(f'{title}: Bounds already set')
+            
+            bin_shower = BinManager(dotplot_view,
                                         bin_width=1,
                                         selection_bin_width=1,
-                                        visible_bins=True,
-                                        show_bins_with_data_only=True,
-                                        use_selection_layer=use_selection_layer,
+                                        visible_bins=False,
+                                        show_bins_with_data_only=False,
                                         )
+            if highlight_bins:
                 bin_shower.setup_bin_layer()
-                
-                def turn_off_bins():
+            
+            def turn_off_bins():
                     bin_shower.turn_off_bins()
-                def turn_on_bins():
-                    if highlight_bins.value:
-                        bin_shower.redraw_bins()
-                
-                def extend_the_tools():  
-                    extend_tool(dotplot_view, 'plotly:home', activate_cb=turn_off_bins, activate_before_tool=True)
-                    extend_tool(dotplot_view, 'plotly:home', activate_cb=_on_reset_bounds, activate_before_tool=False)
-                    extend_tool(dotplot_view, 'plotly:home', activate_cb=turn_on_bins, activate_before_tool=False)
-                    
-                    extend_tool(dotplot_view, 'hubble:wavezoom', activate_cb=turn_off_bins, activate_before_tool=True)
-                    extend_tool(dotplot_view, 'hubble:wavezoom', deactivate_cb=_on_bounds_changed, activate_before_tool=False)
-
-                    extend_tool(dotplot_view, 'hubble:wavezoom', deactivate_cb=turn_on_bins, deactivate_before_tool=False)
-                
-                
-                # extend_tool(dotplot_view, 'hubble:wavezoom', deactivate_cb=turn_on_bin_highlighter)
+            def turn_on_bins():
+                if highlight_bins:
+                    bin_shower.redraw_bins()
+            
+            def extend_the_tools():  
+                extend_tool(dotplot_view, 'hubble:wavezoom', deactivate_cb=_on_wavezoom, )
+                extend_tool(dotplot_view, 'plotly:home', activate_cb=turn_on_bins, activate_before_tool=False)
+                extend_tool(dotplot_view, 'hubble:wavezoom', deactivate_cb=turn_on_bins, deactivate_before_tool=False)
             extend_the_tools()
             tool = dotplot_view.toolbar.tools['plotly:home']
             if tool:
                 tool.activate()
+                old_activate = tool.activate
+                def new_activate():
+                    if len(reset_bounds.value) == 2:
+                        _on_reset_bounds()
+                    else:
+                        old_activate()
+                tool.activate = new_activate
 
             zoom_tool = dotplot_view.toolbar.tools['hubble:wavezoom']
             def on_zoom(bounds_old, bounds_new):
-                dotplot_view.state._update_bins() # type: ignore # type: ignore
+                dotplot_view.state._update_bins()
             zoom_tool.on_zoom = on_zoom
             
             
@@ -424,40 +386,24 @@ def DotplotViewer(
             line_marker_at.subscribe(lambda new_val: _update_lines(value = new_val))
             vertical_line_visible.subscribe(lambda new_val: _update_lines())
             def update_x_bounds(new_val):
+                logger.info(f"{title}: Updating x_bounds")
                 if new_val is not None and len(new_val) == 2:
                     dotplot_view.state.x_min = new_val[0]
                     dotplot_view.state.x_max = new_val[1]
                 reset_selection()
             x_bounds.subscribe(update_x_bounds)
             
-            tool = dotplot_view.toolbar.tools['plotly:home']
-            if tool:
-                tool.activate()
+            home_tool = dotplot_view.toolbar.tools['plotly:home']
+            home_tool.activate()
             
             reset_selection()
-
             
-            def toggle_bin_highlighter(show = True):
-                    if not use_js:
-                        if show:
-                            turn_on_bin_highlighter()
-                        else:
-                            turn_off_bin_highlighter()
-                    else:
-                        if show:
-                            bin_shower.redraw_bins()
-                        else:
-                            bin_shower.turn_off_bins()
-            
-            
-            toggle_bin_highlighter(highlight_bins.value)
-            
-            highlight_bins.subscribe(toggle_bin_highlighter)
-            
+            hide_ignored_layers()
+            hide_layers.subscribe(hide_ignored_layers)
             
             def cleanup():
                 for cnt in (title_widget, toolbar_widget, viewer_widget):
-                    cnt.children = () # type: ignore
+                    cnt.children = ()
 
                 for wgt in (dotplot_view.toolbar, dotplot_view.figure_widget):
                     # wgt.layout.close()
@@ -465,8 +411,6 @@ def DotplotViewer(
 
             return cleanup
 
-        solara.use_effect(_add_viewer, dependencies=[use_selection_layer,use_js])
-        
-        
+        solara.use_effect(_add_viewer, dependencies=[])
 
     return main
