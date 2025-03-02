@@ -163,7 +163,17 @@ def TestViewer(gjapp,
             bin_width.subscribe(on_bin_width_change)
             
             # debug = True will show redo button if not bins are found
-            vc.children = (_PlotlyHighlighting(viewer_id=viewer._unique_class, show=True, debug = True), viewer.figure_widget,) # type: ignore
+            options = {
+                'fillColor': 'rgba(0, 0, 0)',
+                'fillOpacity': 0.5,
+                'strokeColor': 'rgba(255, 0, 255, 1)',
+                'strokeOpacity': 1,
+                'strokeWidth': 1,
+                'opacity': 1,
+                'debug': False,
+                'show': True
+            }
+            vc.children = (_PlotlyHighlighting(viewer_id=viewer._unique_class, **options), viewer.figure_widget,) # type: ignore
         
 
         def cleanup():
