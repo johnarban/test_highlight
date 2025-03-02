@@ -109,10 +109,12 @@ def TestViewer(gjapp,
                                             visible_bins=True,
                                             show_bins_with_data_only=True,
                                             on_hover_callback=on_hover,
+                                            on_click_callback=on_click,
                                             use_selection_layer=use_selection_layer,
                                             setup_selection_layer=True,
                                             only_show=False,
                                             )
+
             if highlight_bins.value:
                 bin_highlighter.setup_bin_highlight()
 

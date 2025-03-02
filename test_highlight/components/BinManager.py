@@ -115,10 +115,16 @@ class BinManager:
             bin_layer = self.bin_layer
             if bin_layer:
                 print('adding callbacks')
-                bin_layer.on_click(self.on_click)
-                bin_layer.on_hover(self.on_hover)
-                bin_layer.on_unhover(self.on_unhover)
+                self.add_callbacks_to_bin_layer()
     
+    def add_callbacks_to_bin_layer(self):
+        if self.bin_layer:
+            if self.on_click:
+                self.bin_layer.on_click(self.on_click)
+            if self.on_hover:
+                self.bin_layer.on_hover(self.on_hover)
+            if self.on_unhover:
+                self.bin_layer.on_unhover(self.on_unhover)
     
     def setup_selection_layer(self):
         if not hasattr(self.viewer, 'selection_layer'):
