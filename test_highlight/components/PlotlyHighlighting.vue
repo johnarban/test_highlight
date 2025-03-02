@@ -304,6 +304,10 @@ export default {
     
     show(value) {
       this.showButtons = value
+    },
+    
+    viewer_id(value) {
+      this.redo()
     }
     
   }

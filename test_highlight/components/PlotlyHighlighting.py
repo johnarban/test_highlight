@@ -28,8 +28,10 @@ class _PlotlyHighlighting(VuetifyTemplate):
 
 
 @solara.component
-def PlotlyHighlighting(viewer_id='', show=False, highlight=True, debug = False):
-    return _PlotlyHighlighting(viewer_id=viewer_id, show=show, highlight=highlight, debug=debug)
+def PlotlyHighlighting(viewer_id: solara.Reactive[str] | str='', show=False, highlight=True, debug = False):
+    viewer_id = solara.reactive(viewer_id)
+    
+    return _PlotlyHighlighting.element(viewer_id=viewer_id.value, show=show, highlight=highlight, debug=debug)
 
     
     
