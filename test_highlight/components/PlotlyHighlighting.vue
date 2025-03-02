@@ -222,7 +222,7 @@ export default {
         }
         ticking = true;
         
-        console.log('tracking mouse')
+        // console.log('tracking mouse')
         window.requestAnimationFrame(() => {
           let foundHighlighted = false;
 

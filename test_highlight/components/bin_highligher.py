@@ -145,7 +145,7 @@ class BinHighlighter(BinManager):
     def _create_hover_trace(self, x: float = 0) -> go.Bar | None:
         if self.dx is None:
             raise ValueError('Hover trace creation failed: dx is None')
-        print('_create_hover_trace', self.dx)
+        # print('_create_hover_trace', self.dx)
         return go.Bar(
             name="hover_trace",
             meta="hover_trace_meta",
@@ -169,7 +169,7 @@ class BinHighlighter(BinManager):
         Args:
             on_hover_callback: Optional callback to be called on hover.
         """
-        print('setup_bin_highlight')
+        # print('setup_bin_highlight')
         if self.only_show:
             self.enabled = True
             return
@@ -245,14 +245,14 @@ class BinHighlighter(BinManager):
                     callback(trace, points, state)
     
     def turn_on_bin_highlight(self):
-        print('turn_on_bin_highlight')
+        # print('turn_on_bin_highlight')
         if self.enabled:
             return
         self.setup_bin_highlight()
 
     
     def turn_off_bin_highlight(self):
-        print('turn_off_bin_highlight')
+        # print('turn_off_bin_highlight')
         if self.highlight_trace:
             # Get all traces except the highlight trace
             traces_to_keep = lambda t: t != self.highlight_trace and getattr(t, "meta", None) != "hover_trace_meta"
@@ -285,7 +285,7 @@ class BinHighlighter(BinManager):
     def redraw(self):
         """Redwaw the bin highlight"""
         # if self.enabled:
-        print('redraw')
+        # print('redraw')
         self.turn_off_bin_highlight()
         self.turn_off_bins()
         self.setup_bin_layer()

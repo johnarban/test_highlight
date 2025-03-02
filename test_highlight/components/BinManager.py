@@ -50,7 +50,7 @@ class BinManager:
             return
         self.bins = (bin_edges[0:-1] + bin_edges[1:]) / 2
         self.dx = bin_edges[1] - bin_edges[0]
-        print("finding dx", self.dx)
+        # print("finding dx", self.dx)
         self.ymax = self.viewer.state.y_max
     
     def _filter_bins(self):
@@ -91,7 +91,7 @@ class BinManager:
             return nearest
 
     def setup_bin_layer(self):
-        print("Setting up bins")
+        # print("Setting up bins")
         self._calculate_bins()
         if self.bins is None or self.dx is None:
             return
@@ -114,7 +114,7 @@ class BinManager:
         if not self.use_selection_layer:
             bin_layer = self.bin_layer
             if bin_layer:
-                print('adding callbacks')
+                # print('adding callbacks')
                 self.add_callbacks_to_bin_layer()
     
     def add_callbacks_to_bin_layer(self):
