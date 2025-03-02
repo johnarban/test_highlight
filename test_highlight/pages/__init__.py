@@ -36,9 +36,10 @@ def Page():
     nbins = solara.use_reactive(25)
     bin_width = solara.use_reactive(1.0)
     
-    use_selection_layer = solara.use_reactive(True)
     
-    use_js = solara.use_reactive(True)
+    use_selection_layer = solara.use_reactive(False)
+    
+    use_js = solara.use_reactive(False)
     
     def _glue_setup():
         glue_app = JupyterApplication()
@@ -129,7 +130,7 @@ def Page():
                 value = use_js
                 ) # type: ignore
             solara.Text(f'Number of Clicks: {num_clicks.value}')
-            solara.Text(f'Number of Hovers: {hover_count.value}')
+            solara.Text(f'Number of Hovers: {hover_count.value if not use_js.value else "N/A"}')
             solara.Text(f'Click is at: {line_marker_at.value:0.3f}')
             solara.Text(f'Hover is at: {hover_location.value:0.3f}')
             solara.Switch(
@@ -138,8 +139,11 @@ def Page():
             ) # type: ignore
             # create a circular div that is green or red  if clicked or not
             with rv.Html(tag='span',style_="display: flex; gap:15px; align-items: center;"):  # type: ignore
-                solara.Text('Hovering: ')
-                rv.Html(tag='div', style_=f"width: 15px; height: 15px; border-radius: 50%; background-color: {'green' if is_hovering.value else 'red'}")  # type: ignore
+                if use_js.value:
+                    solara.Text('Using Plotly Highlighter: No hover events')
+                else:
+                    solara.Text('Hovering: ')
+                    rv.Html(tag='div', style_=f"width: 15px; height: 15px; border-radius: 50%; background-color: {'green' if is_hovering.value else 'red'}")  # type: ignore
             with solara.Card(style='width: 500px'):
                 solara.SliderInt(label='Number of Bins', value=nbins, min=1, max=100)
                 solara.SliderFloat(label='Bin Width', value=bin_width, min=0.1, max=1)  # type: ignore
