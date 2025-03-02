@@ -19,12 +19,14 @@ class BinManager:
         on_click: Optional[Callable] = None,
         on_hover: Optional[Callable] = None,
         on_unhover: Optional[Callable] = None,
+        make_bins: bool = True,
     ):
         self.viewer = viewer
         self.bin_width = bin_width
         self.selection_bin_width = selection_bin_width
         self.only_show_with_data = show_bins_with_data_only
         self.visible_bins = visible_bins
+        self.make_bins = make_bins
         self.traces_added = False
         self.bins = None
         self.dx = None
@@ -100,9 +102,9 @@ class BinManager:
         if self.visible_bins:
             marker_style = {"color": "rgba(0,0,0,0)", "line": {"color": "rgba(0,0,0,1)"}}
         else:
-            marker_style = {"color": "rgba(0,0,0,0)", "line": {"color": "rgba(0,0,0,1)"}}
+            marker_style = {"color": "rgba(0,0,0,0)", "line": {"color": "rgba(0,0,0,0)"}}
         
-        if self.visible_bins or not self.use_selection_layer:
+        if self.make_bins or not self.use_selection_layer:
             self.viewer.figure.add_trace(self._create_bin_layer(marker_style = marker_style))
 
         self.traces_added = True
