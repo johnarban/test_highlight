@@ -14,12 +14,12 @@ from hubbleds.utils import PLOTLY_MARGINS
 @solara.component
 def TestViewer(gjapp, 
                data: Optional[Data] = None, 
-               highlight_bins: solara.Reactive[bool] | bool = False,    
-               only_show_bins: solara.Reactive[bool] | bool = False, 
-               use_selection_layer: bool = False,
+               highlight_bins: solara.Reactive[bool] | bool = True,    
+               show_bins_with_data_only: solara.Reactive[bool] | bool = False, 
+               use_selection_layer: bool = True,
                on_click_callback = None, 
                on_hover_callback = None,
-               nbins: solara.Reactive[int] | int = 5,
+               nbins: solara.Reactive[int] | int = 15,
                bin_width: solara.Reactive[float] | float = 1,
                use_python_highlighing: bool = True
                ):
@@ -30,11 +30,26 @@ def TestViewer(gjapp,
         gjapp: The Glue Jupyter application object.
         data: Optional Glue Data object.
         highlight_bins: Boolean or reactive value to enable bin highlighting.
-        use_selection_layer: Boolean or reactive value to use the selection layer.
+            - Default: True for BinHighlighter, False for PlotlyHighlighting
+        show_bins_with_data_only: Boolean or reactive value to only show bins with data.
+            - Default: False for both BinHighlighter and PlotlyHighlighting
+        use_selection_layer: Boolean to use the selection layer.
+            - Default: True for both BinHighlighter and PlotlyHighlighting
         on_click_callback: Optional callback to be called on click.
         on_hover_callback: Optional callback to be called on hover.
         nbins: Integer or reactive value for the number of bins.
-    
+            - Default: 15 for both BinHighlighter and PlotlyHighlighting
+        bin_width: Float or reactive value for the bin width.
+            - Default: 1.0 for both BinHighlighter and PlotlyHighlighting
+        use_python_highlighing: Boolean to use Python-based highlighting (BinHighlighter) or Plotly-based highlighting (PlotlyHighlighting).
+            - Default: True for BinHighlighter, False for PlotlyHighlighting
+
+    Explanation:
+        - `use_selection_layer`: When set to True, the selection layer is used to handle interactions like clicks and hovers. This is useful for more complex interactions.
+        - `show_bins_with_data_only`: When set to True, only bins that contain data will be shown. This helps in focusing on relevant data points.
+        - `highlight_bins`: When set to True, bins will be highlighted based on interactions like hover or click. This is useful for visual emphasis on certain data points.
+        - `use_python_highlighing`: When set to False, the PlotlyHighlighter is used, which does not emit hover events. Instead, it highlights elements based on mouse movements over the plot.
+
     Example:
         ```python
         import solara
@@ -59,10 +74,8 @@ def TestViewer(gjapp,
     highlight_bins = solara.use_reactive(highlight_bins)
     nbins = solara.use_reactive(nbins)
     bin_width = solara.use_reactive(bin_width)
-    only_show_bins = solara.use_reactive(only_show_bins)
+    show_bins_with_data_only = solara.use_reactive(show_bins_with_data_only)
 
-
-    
     def _viewer_setup(data):
         print('Setting up viewer')
         if data is None:
@@ -78,10 +91,8 @@ def TestViewer(gjapp,
         viewer.figure_widget.update_layout(height=None, width=None)
         viewer.figure_widget.update_layout(autosize=True, height=300)
         
-        
         vc = solara.get_widget(viewer_container)
 
-        
         viewer.state.hist_n_bin = nbins.value
         nbins.subscribe(lambda x: setattr(viewer.state, 'hist_n_bin', x))
         
@@ -91,10 +102,8 @@ def TestViewer(gjapp,
             if len(points.xs) == 0:
                 print('No points selected')
         
-        
         viewer.selection_layer.on_click(on_click)
         
-    
         # Create BinHighlighter instance
         if use_python_highlighing:
             vc.children = (viewer.figure_widget,) # type: ignore
@@ -129,7 +138,6 @@ def TestViewer(gjapp,
             toggle_bin_highlight(highlight_bins.value)
             highlight_bins.subscribe(toggle_bin_highlight)      
             
-            
             def on_nbins_change(value):
                 if bin_highlighter is not None:
                     bin_highlighter.redraw()
@@ -141,12 +149,11 @@ def TestViewer(gjapp,
             bin_width.subscribe(on_bin_width_change)
             
         else:
-        
             bin_shower = BinManager(viewer,
                                     bin_width=bin_width.value,
                                     selection_bin_width=bin_width.value,
                                     visible_bins=True,
-                                    show_bins_with_data_only=True,
+                                    show_bins_with_data_only=show_bins_with_data_only.value,
                                     use_selection_layer=use_selection_layer,
                                     on_click=on_click,
             )
@@ -174,7 +181,6 @@ def TestViewer(gjapp,
                 'show': True
             }
             vc.children = (_PlotlyHighlighting(viewer_id=viewer._unique_class, **options), viewer.figure_widget,) # type: ignore
-        
 
         def cleanup():
                 vc.children = () # type: ignore
@@ -182,11 +188,7 @@ def TestViewer(gjapp,
 
         return cleanup
 
-
-    
-
-    
-    solara.use_effect(lambda :_viewer_setup(data), dependencies=[only_show_bins.value, use_python_highlighing, use_selection_layer])
+    solara.use_effect(lambda :_viewer_setup(data), dependencies=[show_bins_with_data_only.value, use_python_highlighing, use_selection_layer])
     
     return viewer_container
 

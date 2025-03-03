@@ -25,7 +25,7 @@ def Page():
     line_marker_at = solara.use_reactive(0)
     hover_location = solara.use_reactive(0)
     highlight_bins = solara.use_reactive(True)
-    only_show_bins = solara.use_reactive(False)
+    show_bins_with_data_only = solara.use_reactive(False)
     
     num_clicks = solara.use_reactive(0)
     hover_count = solara.use_reactive(0)
@@ -122,8 +122,8 @@ def Page():
                 value = highlight_bins
                 ) # type: ignore
             solara.Switch(
-                label = 'Only Show Bins',
-                value = only_show_bins
+                label = 'Show Bins with Data Only',
+                value = show_bins_with_data_only
                 ) # type: ignore
             solara.Switch(
                 label = 'Use Plotly Highlighter',
@@ -160,7 +160,7 @@ def Page():
                 on_click_callback=click_callback,
                 on_hover_callback=hover_callback,
                 highlight_bins=highlight_bins,
-                only_show_bins=only_show_bins,
+                show_bins_with_data_only=show_bins_with_data_only,
                 nbins=nbins,
                 bin_width=bin_width,
                 use_python_highlighing=not use_js.value,
@@ -181,7 +181,7 @@ def Page():
                 y_label = 'Count',
                 highlight_bins=highlight_bins.value,
                 nbin=nbins.value,
-                )      
-            
-        
-        
+                )
+
+
+
